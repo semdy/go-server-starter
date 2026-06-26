@@ -91,9 +91,13 @@ Route-group middleware: `jwt.JWT()` (token validation + auto-refresh when < 1/3 
 
 ### Config Loading
 
-`internal/config/config.go`: loads `config.yml` (base), then `config.{mode}.yml` (merged), then env vars with `APP_` prefix. Key separator in env vars is `_` (e.g. `APP_DATABASE_PASSWORD` maps to `database.password`). Defaults come from `DefaultConfig` struct in `default.go`.
+`internal/config/config.go` uses **koanf v2** (migrated from Viper). Loads in priority order:
+1. `DefaultConfig` struct (lowest — empty strings for secrets)
+2. `config.yml` (base)
+3. `config.{mode}.yml` (merged, optional)
+4. Env vars with `APP_` prefix (highest — e.g. `APP_DATABASE_PASSWORD` maps to `database.password`)
 
-Available modes: `dev`, `prod`, `test` — set via `-mode` flag or `APP_MODE` env var.
+Config struct tags use `koanf:"..."` (replaced `mapstructure` tags). Available modes: `dev`, `prod`, `test` — set via `-mode` flag or `APP_MODE` env var.
 
 ### Adding a New Entity
 
@@ -117,7 +121,7 @@ The `generate.sh` script scaffolds model/repo/dto/service/handler boilerplate fo
 | Redis | go-redis/v9 |
 | JWT | golang-jwt/v5 |
 | Logging | Zap + Lumberjack (rotation) |
-| Config | Viper (env prefix: `APP_`) |
+| Config | koanf v2 (env prefix: `APP_`) |
 | Task queue | Asynq |
 | ID generation | bwmarrin/snowflake |
 | Validation | go-playground/validator/v10 |
@@ -128,3 +132,6 @@ The `generate.sh` script scaffolds model/repo/dto/service/handler boilerplate fo
 - **Secrets**: Never commit secrets. `configs/config.{dev,test,prod}.yml` and `.env` are gitignored. Use `config.dev.yml.example` as template. Env vars with `APP_` prefix override config values in production.
 - **Verification codes**: The `verifyCode()` function in `auth_service.go` currently only checks non-empty. A TODO marks where real SMS/email verification should be integrated.
 - **Test mocks**: `internal/service/*_test.go` uses stub implementations that embed the real repo interfaces and override only the methods needed. Follow this pattern for new service tests.
+- **Zap vs slog**: Zap is kept (not migrated to stdlib `log/slog`). Rationale: the current setup uses multi-core output (separate info.log / error.log + console) with Lumberjack rotation, which slog cannot replicate without significant custom handler code. Zap also provides the GORM logger adapter. Performance difference is negligible for real workloads.
+- **Config struct tags**: Schema tags use `koanf:"..."` (not `mapstructure`). When adding new config fields, use `koanf` struct tags.
+- **QueryOption column safety**: `WhereAutoLike`/`WhereAutoLikePrefix`/`WhereAutoLikeSuffix` validate column names against a safe regex and backtick-quote them. When adding new dynamic-column functions, use `quoteColumnName()`.

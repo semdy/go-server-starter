@@ -2,10 +2,23 @@ package repo
 
 import (
 	"fmt"
+	"regexp"
 
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
+
+// safeColumnNameRegex allows only valid SQL column identifiers (alphanumeric + underscore + optional dot).
+var safeColumnNameRegex = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)*$`)
+
+// quoteColumnName validates and backtick-quotes a column name for safe SQL embedding.
+// Returns the quoted name and an error if the name contains invalid characters.
+func quoteColumnName(name string) (string, error) {
+	if !safeColumnNameRegex.MatchString(name) {
+		return "", fmt.Errorf("unsafe column name: %q", name)
+	}
+	return fmt.Sprintf("`%s`", name), nil
+}
 
 type QueryOption func(*gorm.DB) *gorm.DB
 
@@ -92,30 +105,48 @@ func WherePtrNonEmpty[T comparable](query string, arg *T) QueryOption {
 }
 
 // WhereAutoLike ( name LIKE ?  %string% )
+// The column name is validated against a safe pattern and backtick-quoted to prevent SQL injection.
 func WhereAutoLike(name string, arg *string) QueryOption {
 	return func(db *gorm.DB) *gorm.DB {
 		if arg != nil && *arg != "" {
-			return db.Where(fmt.Sprintf("%s LIKE ?", name), "%"+*arg+"%")
+			qn, err := quoteColumnName(name)
+			if err != nil {
+				_ = db.AddError(err)
+				return db
+			}
+			return db.Where(fmt.Sprintf("%s LIKE ?", qn), "%"+*arg+"%")
 		}
 		return db
 	}
 }
 
 // WhereAutoLikePrefix ( name LIKE ?  string% )
+// The column name is validated against a safe pattern and backtick-quoted to prevent SQL injection.
 func WhereAutoLikePrefix(name string, arg *string) QueryOption {
 	return func(db *gorm.DB) *gorm.DB {
 		if arg != nil && *arg != "" {
-			return db.Where(fmt.Sprintf("%s LIKE ?", name), *arg+"%")
+			qn, err := quoteColumnName(name)
+			if err != nil {
+				_ = db.AddError(err)
+				return db
+			}
+			return db.Where(fmt.Sprintf("%s LIKE ?", qn), *arg+"%")
 		}
 		return db
 	}
 }
 
 // WhereAutoLikeSuffix ( name LIKE ?  %string )
+// The column name is validated against a safe pattern and backtick-quoted to prevent SQL injection.
 func WhereAutoLikeSuffix(name string, arg *string) QueryOption {
 	return func(db *gorm.DB) *gorm.DB {
 		if arg != nil && *arg != "" {
-			return db.Where(fmt.Sprintf("%s LIKE ?", name), "%"+*arg)
+			qn, err := quoteColumnName(name)
+			if err != nil {
+				_ = db.AddError(err)
+				return db
+			}
+			return db.Where(fmt.Sprintf("%s LIKE ?", qn), "%"+*arg)
 		}
 		return db
 	}

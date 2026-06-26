@@ -30,4 +30,7 @@ func (r *Router) SetupRoutes() {
 
 	// User - 用户相关
 	r.SetupUserRoutes()
+
+	// UserRole - 角色管理（管理员）
+	r.SetupUserRoleRoutes()
 }

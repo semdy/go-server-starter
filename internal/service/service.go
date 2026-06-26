@@ -21,7 +21,7 @@ type ServiceImpl struct {
 	db              *gorm.DB
 	config          *config.Config
 	jwt             *jwt.JWT
-	redis           *redis.Redis
+	redis           *redis.Client
 	snowflake       *snowflake.Snowflake
 	logger          *zap.Logger
 	userService     UserService
@@ -29,7 +29,7 @@ type ServiceImpl struct {
 	authService     AuthService
 }
 
-func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Redis, snowflake *snowflake.Snowflake, repo repo.Repo, logger *zap.Logger) Service {
+func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, logger *zap.Logger) Service {
 	return &ServiceImpl{
 		db:              db,
 		config:          config,

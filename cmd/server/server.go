@@ -17,18 +17,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	vc, err := config.NewViperConfig(serverMode)
+	cl, err := config.NewConfigLoader(serverMode)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to create viper config: %v\n", err)
+		fmt.Fprintf(os.Stderr, "failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	logger := logger.NewLogger(&vc.GetConfig().Logger, *serverMode)
+	logger := logger.NewLogger(&cl.GetConfig().Logger, *serverMode)
 	defer logger.Sync()
 
 	logger.Info(fmt.Sprintf("Starting server in %s mode", serverMode.String()))
 
-	app := app.NewApp(vc.GetConfig(), logger)
+	app := app.NewApp(cl.GetConfig(), logger)
 	if err := app.Start(); err != nil {
 		logger.Fatal(err.Error())
 	}

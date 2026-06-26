@@ -9,20 +9,22 @@ import (
 	"go.uber.org/zap"
 )
 
-type Redis struct {
+// Client wraps a Redis client with a logger.
+type Client struct {
 	*redis.Client
 	logger *zap.Logger
 }
 
-func NewRedis(config config.RedisConfig, logger *zap.Logger, ctx context.Context) (*Redis, error) {
+// NewClient creates a new Redis client and verifies connectivity.
+func NewClient(cfg config.RedisConfig, logger *zap.Logger, ctx context.Context) (*Client, error) {
 	db := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", config.Host, config.Port),
-		Password: config.Password,
-		DB:       config.DB,
+		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Password: cfg.Password,
+		DB:       cfg.DB,
 	})
 
 	if err := db.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("connect to redis failed: %w", err)
 	}
-	return &Redis{db, logger}, nil
+	return &Client{db, logger}, nil
 }

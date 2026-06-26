@@ -15,11 +15,11 @@ import (
 )
 
 type RateLimit struct {
-	redis  *redis.Redis
+	redis  *redis.Client
 	logger *zap.Logger
 }
 
-func NewRateLimit(redis *redis.Redis, logger *zap.Logger) *RateLimit {
+func NewRateLimit(redis *redis.Client, logger *zap.Logger) *RateLimit {
 	return &RateLimit{redis: redis, logger: logger}
 }
 

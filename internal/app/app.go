@@ -32,7 +32,7 @@ type App struct {
 	engine     *gin.Engine
 	server     *http.Server
 	db         *database.DB
-	redis      *redis.Redis
+	redis      *redis.Client
 	logger     *zap.Logger
 	snowflake  *snowflake.Snowflake
 	translator *translator.Translator
@@ -113,7 +113,7 @@ func (a *App) Start() error {
 	}
 
 	// 初始化redis
-	redis, err := redis.NewRedis(a.config.Redis, a.logger.Named("redis"), context.Background())
+	redis, err := redis.NewClient(a.config.Redis, a.logger.Named("redis"), context.Background())
 	if err != nil {
 		return err
 	}

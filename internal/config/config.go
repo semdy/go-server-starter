@@ -5,124 +5,117 @@ import (
 	"fmt"
 	"go-server-starter/internal/enum"
 	"os"
-	"reflect"
 	"strings"
 
-	"github.com/spf13/viper"
+	"github.com/knadh/koanf/parsers/yaml"
+	koanfenv "github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/providers/structs"
+	"github.com/knadh/koanf/v2"
 )
 
 type Config struct {
-	Server     ServerConfig     `mapstructure:"server"`
-	JWT        JWTConfig        `mapstructure:"jwt"`
-	Database   DatabaseConfig   `mapstructure:"database"`
-	Redis      RedisConfig      `mapstructure:"redis"`
-	AsynQ      AsynQConfig      `mapstructure:"asynQ"`
-	Logger     LoggerConfig     `mapstructure:"logger"`
-	GormLogger GormLoggerConfig `mapstructure:"gormLogger"`
-	Mode       enum.ServerMode  `mapstructure:"-"`
+	Server     ServerConfig     `koanf:"server"`
+	JWT        JWTConfig        `koanf:"jwt"`
+	Database   DatabaseConfig   `koanf:"database"`
+	Redis      RedisConfig      `koanf:"redis"`
+	AsynQ      AsynQConfig      `koanf:"asynQ"`
+	Logger     LoggerConfig     `koanf:"logger"`
+	GormLogger GormLoggerConfig `koanf:"gormLogger"`
+	Mode       enum.ServerMode  `koanf:"-"`
 }
 
-type ViperConfig struct {
-	v      *viper.Viper
+// ConfigLoader manages koanf-based configuration loading.
+type ConfigLoader struct {
+	k      *koanf.Koanf
 	config *Config
-	env    *enum.ServerMode
+	mode   *enum.ServerMode
 }
 
-func NewViperConfig(env *enum.ServerMode) (*ViperConfig, error) {
-	config := &Config{Mode: *env}
-	v := viper.New()
-	var vc = &ViperConfig{v, config, env}
-	setDefaultConfig(v)
-	v.SetConfigType("yaml")
-	v.AddConfigPath(".")
-	v.AddConfigPath("./configs")
+// NewConfigLoader creates a new config loader for the given server mode.
+func NewConfigLoader(mode *enum.ServerMode) (*ConfigLoader, error) {
+	config := &Config{Mode: *mode}
+	k := koanf.New(".")
 
-	vc.LoadConfig()
-
-	return vc, nil
-}
-
-func (vc *ViperConfig) GetConfig() *Config {
-	return vc.config
-}
-
-func (vc *ViperConfig) Viper() *viper.Viper {
-	return vc.v
-}
-
-func (vc *ViperConfig) LoadConfig() error {
-	tryFiles := []string{
-		"config",
-		"config." + vc.env.String(),
+	// Step 1: Load defaults from DefaultConfig struct (lowest priority)
+	if err := k.Load(structs.Provider(DefaultConfig, "koanf"), nil); err != nil {
+		return nil, fmt.Errorf("failed to load defaults: %w", err)
 	}
-	if err := vc.LoadMultiFilesConfig(tryFiles); err != nil {
-		return err
+
+	cl := &ConfigLoader{k, config, mode}
+
+	// Step 2: Load config files
+	if err := cl.loadConfigFiles(); err != nil {
+		return nil, err
 	}
-	vc.v.SetEnvPrefix("APP")
-	vc.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	vc.v.AutomaticEnv()
-	if err := vc.v.Unmarshal(vc.config); err != nil {
-		return fmt.Errorf("parse config failed: %w", err)
+
+	// Step 3: Load environment variables (highest priority)
+	if err := k.Load(koanfenv.Provider("APP_", ".", envToConfigKey), nil); err != nil {
+		fmt.Printf("warning: failed to load env vars: %v\n", err)
 	}
-	return nil
+
+	// Step 4: Unmarshal into config struct
+	if err := k.UnmarshalWithConf("", config, koanf.UnmarshalConf{Tag: "koanf", FlatPaths: false}); err != nil {
+		return nil, fmt.Errorf("parse config failed: %w", err)
+	}
+
+	return cl, nil
 }
 
-func (vc *ViperConfig) LoadMultiFilesConfig(tryFiles []string) error {
-	for i, configName := range tryFiles {
-		vc.v.SetConfigName(configName)
-		var err error
-		if i == 0 {
-			err = vc.v.ReadInConfig()
-		} else {
-			err = vc.v.MergeInConfig()
-		}
+// GetConfig returns the parsed configuration.
+func (cl *ConfigLoader) GetConfig() *Config {
+	return cl.config
+}
+
+// loadConfigFiles loads base config and mode-specific config, merging them.
+func (cl *ConfigLoader) loadConfigFiles() error {
+	tryFiles := []string{"config", "config." + cl.mode.String()}
+
+	for i, name := range tryFiles {
+		path, err := cl.findConfigFile(name + ".yml")
 		if err != nil {
-			if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-				fmt.Printf("config file %s.yml not found, skip\n", configName)
+			// Mode-specific config file is optional
+			if i > 0 {
+				fmt.Printf("config file %s.yml not found, skip\n", name)
 				continue
 			}
-			return fmt.Errorf("load config file %s failed: %w", configName, err)
+			return fmt.Errorf("base config file not found: %w", err)
 		}
-		fmt.Printf("✓ loaded: %s.yml\n", configName)
+
+		if err := cl.k.Load(file.Provider(path), yaml.Parser()); err != nil {
+			return fmt.Errorf("failed to parse %s: %w", path, err)
+		}
+
+		fmt.Printf("✓ loaded: %s\n", path)
 	}
 	return nil
 }
 
-func setDefaultConfig(v *viper.Viper) {
-	setDefaultsFromStruct(v, "server", DefaultConfig.Server)
-	setDefaultsFromStruct(v, "jwt", DefaultConfig.JWT)
-	setDefaultsFromStruct(v, "database", DefaultConfig.Database)
-	setDefaultsFromStruct(v, "redis", DefaultConfig.Redis)
-	setDefaultsFromStruct(v, "asynQ", DefaultConfig.AsynQ)
-	setDefaultsFromStruct(v, "logger", DefaultConfig.Logger)
-	setDefaultsFromStruct(v, "gormLogger", DefaultConfig.GormLogger)
-}
-
-func setDefaultsFromStruct(v *viper.Viper, prefix string, structValue interface{}) {
-	_type := reflect.TypeOf(structValue)
-	_value := reflect.ValueOf(structValue)
-	for i := 0; i < _value.NumField(); i++ {
-		field := _value.Field(i)
-		fieldType := _type.Field(i)
-		tag := fieldType.Tag.Get("mapstructure")
-		if tag == "" {
-			tag = strings.ToLower(fieldType.Name)
-		}
-		configKey := fmt.Sprintf("%s.%s", prefix, tag)
-		if field.IsValid() && field.CanInterface() {
-			v.SetDefault(configKey, field.Interface())
+// findConfigFile searches for a config file in the current directory and ./configs/.
+func (cl *ConfigLoader) findConfigFile(filename string) (string, error) {
+	searchPaths := []string{filename, "configs/" + filename}
+	for _, p := range searchPaths {
+		if _, err := os.Stat(p); err == nil {
+			return p, nil
 		}
 	}
+	return "", fmt.Errorf("%s not found in . or ./configs", filename)
 }
 
+// envToConfigKey transforms an env var name (without prefix) into a koanf config key.
+// E.g. "DATABASE_PASSWORD" → "database.password"
+func envToConfigKey(envVar string) string {
+	return strings.ReplaceAll(strings.ToLower(envVar), "_", ".")
+}
+
+// ParseMode reads the server mode from APP_MODE env var or -mode flag.
 func ParseMode() (*enum.ServerMode, error) {
-	var mode = "dev"
+	mode := "dev"
 	if envMode := os.Getenv("APP_MODE"); envMode != "" {
 		mode = envMode
 	}
 
 	flagMode := flag.String("mode", mode, "set app mode, valid modes: dev, prod, test")
-
 	flag.Parse()
 
 	serverMode, err := enum.ParseServerMode(*flagMode)

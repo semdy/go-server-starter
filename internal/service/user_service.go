@@ -28,7 +28,7 @@ type UserServiceImpl struct {
 	logger *zap.Logger
 }
 
-func NewUserService(repo repo.Repo, redis *redis.Redis, logger *zap.Logger) UserService {
+func NewUserService(repo repo.Repo, redis *redis.Client, logger *zap.Logger) UserService {
 	return &UserServiceImpl{
 		repo:   repo,
 		logger: logger,
