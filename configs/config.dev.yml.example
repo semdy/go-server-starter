@@ -1,0 +1,23 @@
+# Local Development Configuration
+# Copy this file to config.dev.yml and adjust as needed.
+# config.dev.yml is gitignored and will never be committed.
+
+server:
+  port: 8090
+
+jwt:
+  tokenSecret: dev-secret-do-not-use-in-production
+
+database:
+  password: root
+
+redis:
+  password: root
+
+asynQ:
+  redisConfig:
+    password: root
+
+logger:
+  level: debug
+  fileDir: ./logs/dev

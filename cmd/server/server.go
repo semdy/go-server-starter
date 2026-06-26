@@ -13,12 +13,14 @@ import (
 func main() {
 	serverMode, err := config.ParseMode()
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "failed to parse server mode: %v\n", err)
+		os.Exit(1)
 	}
 
 	vc, err := config.NewViperConfig(serverMode)
 	if err != nil {
-		panic(err)
+		fmt.Fprintf(os.Stderr, "failed to create viper config: %v\n", err)
+		os.Exit(1)
 	}
 
 	logger := logger.NewLogger(&vc.GetConfig().Logger, *serverMode)

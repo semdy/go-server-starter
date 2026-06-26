@@ -2,8 +2,8 @@ database:
   host: localhost
   port: 3306
   username: root
-  password: root
-  name: test_db 
+  # password: set via APP_DATABASE_PASSWORD env var
+  name: test_db
   maxIdleConns: 10
   maxOpenConns: 100
   connMaxLifetime: 10s
@@ -14,13 +14,13 @@ database:
 redis:
   host: localhost
   port: 6379
-  password: root
+  # password: set via APP_REDIS_PASSWORD env var
   db: 0
 
 asynQ:
   redisConfig:
     host: localhost
     port: 6379
-    password: root
+    # password: set via APP_ASYNQ_REDISCONFIG_PASSWORD env var
     db: 1
   concurrency: 10

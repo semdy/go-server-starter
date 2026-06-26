@@ -19,7 +19,13 @@ import (
 var gormSourceDir string
 
 func init() {
-	_, file, _, _ := runtime.Caller(0)
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		// Fallback: unable to determine source directory; FileWithLineNum may return empty strings.
+		// This should never happen in practice.
+		println("warning: gorm logger: unable to determine source directory via runtime.Caller")
+		return
+	}
 	// compatible solution to get gorm source directory with various operating systems
 	gormSourceDir = sourceDir(file)
 }

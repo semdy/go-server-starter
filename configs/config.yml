@@ -8,7 +8,7 @@ server:
 
 jwt:
   issuer: go-server-starter
-  tokenSecret: tokenSecret@123
+  # tokenSecret: set via APP_JWT_TOKENSECRET env var or mode-specific config
   tokenExpires:
     web: 24h
     desktop: 360h # 15 * 24 hours
@@ -21,7 +21,7 @@ database:
   host: localhost
   port: 3306
   username: root
-  password: root
+  # password: set via APP_DATABASE_PASSWORD env var or mode-specific config
   name: test_db
   maxIdleConns: 10
   maxOpenConns: 100
@@ -33,14 +33,14 @@ database:
 redis:
   host: localhost
   port: 6379
-  password: root
+  # password: set via APP_REDIS_PASSWORD env var or mode-specific config
   db: 0
 
 asynQ:
   redisConfig:
     host: localhost
     port: 6379
-    password: root
+    # password: set via APP_ASYNQ_REDISCONFIG_PASSWORD env var or mode-specific config
     db: 1
   concurrency: 10
 

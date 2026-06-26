@@ -9,6 +9,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// sensitiveHeaders lists headers that should be redacted from logs.
+var sensitiveHeaders = map[string]bool{
+	"Authorization": true,
+	"Cookie":        true,
+	"Set-Cookie":    true,
+	"X-Api-Key":     true,
+}
+
 func ZapLogger(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
@@ -16,7 +24,11 @@ func ZapLogger(logger *zap.Logger) gin.HandlerFunc {
 		headers := c.Request.Header
 		headersMap := make(map[string]string)
 		for k, v := range headers {
-			headersMap[k] = strings.Join(v, ",")
+			if sensitiveHeaders[k] {
+				headersMap[k] = "[REDACTED]"
+			} else {
+				headersMap[k] = strings.Join(v, ",")
+			}
 		}
 		c.Next()
 		timeSpend := time.Since(start)

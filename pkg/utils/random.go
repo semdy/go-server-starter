@@ -3,7 +3,6 @@ package utils
 import (
 	"math/rand/v2"
 	"strings"
-	"time"
 )
 
 type CharSet string
@@ -15,10 +14,8 @@ const (
 	AlphaAll   CharSet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 )
 
-var (
-	rs = rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 1))
-)
-
+// RandomCode generates a random string of the given length from the given character sets.
+// Uses math/rand/v2 top-level functions which are concurrency-safe.
 func RandomCode(length int, charset ...CharSet) string {
 	var chars string
 	for _, c := range charset {
@@ -26,7 +23,7 @@ func RandomCode(length int, charset ...CharSet) string {
 	}
 	code := make([]byte, length)
 	for i := range code {
-		code[i] = chars[rs.IntN(len(chars))]
+		code[i] = chars[rand.IntN(len(chars))]
 	}
 	return string(code)
 }

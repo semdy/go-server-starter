@@ -58,7 +58,8 @@ func (vc *ViperConfig) LoadConfig() error {
 	if err := vc.LoadMultiFilesConfig(tryFiles); err != nil {
 		return err
 	}
-	// vc.v.SetEnvPrefix("GO_SERVER_STARTER")
+	vc.v.SetEnvPrefix("APP")
+	vc.v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	vc.v.AutomaticEnv()
 	if err := vc.v.Unmarshal(vc.config); err != nil {
 		return fmt.Errorf("parse config failed: %w", err)

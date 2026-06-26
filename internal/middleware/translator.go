@@ -33,9 +33,15 @@ func extractLocale(c *gin.Context) string {
 		return locale
 	}
 	// 解析 Accept-Language，自动按 q 值排序
-	tags, _, _ := language.ParseAcceptLanguage(c.GetHeader("Accept-Language"))
+	tags, _, err := language.ParseAcceptLanguage(c.GetHeader("Accept-Language"))
+	if err != nil {
+		// Parsing failed; return empty string and let NormalizeLocale fall back to default
+		return ""
+	}
 	// 匹配到最佳支持的语言
 	tag, _, _ := matcher.Match(tags...)
+	// Match always returns a tag (the first in the supported list when no match found),
+	// so ignoring its confidence return value is intentional.
 
 	return tag.String()
 }

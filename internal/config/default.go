@@ -15,7 +15,7 @@ var DefaultConfig = Config{
 	},
 	JWT: JWTConfig{
 		Issuer:      "go-server-starter",
-		TokenSecret: "tokenSecret@123",
+		TokenSecret: "", // MUST be set via environment variable or config file
 		TokenExpires: MultiTokenExpireConfig{
 			Web:             24 * time.Hour,
 			Desktop:         15 * 24 * time.Hour,
@@ -29,7 +29,7 @@ var DefaultConfig = Config{
 		Host:            "localhost",
 		Port:            3306,
 		Username:        "root",
-		Password:        "root",
+		Password:        "", // MUST be set via environment variable or config file
 		Name:            "test_db",
 		MaxIdleConns:    10,
 		MaxOpenConns:    100,
@@ -41,14 +41,14 @@ var DefaultConfig = Config{
 	Redis: RedisConfig{
 		Host:     "localhost",
 		Port:     6379,
-		Password: "root",
+		Password: "", // MUST be set via environment variable or config file
 		DB:       0,
 	},
 	AsynQ: AsynQConfig{
 		RedisConfig: RedisConfig{
 			Host:     "localhost",
 			Port:     6379,
-			Password: "root",
+			Password: "", // MUST be set via environment variable or config file
 			DB:       1,
 		},
 		Concurrency: 10,

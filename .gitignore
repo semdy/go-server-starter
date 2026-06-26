@@ -1,8 +1,14 @@
-
+# Environment files (contain secrets)
+.env
 configs/config.prod.yml
+configs/config.dev.yml
+configs/config.test.yml
 
+# Logs
 logs/
 
+# OS
 .DS_Store
 
+# Build artifacts
 tmp/

@@ -34,7 +34,10 @@ func NewDB(cfg config.DatabaseConfig, logger logger.Interface, gormConfig *gorm.
 		return nil, errors.New("MaxOpenConns must be greater than 0")
 	}
 
-	loc, _ := time.LoadLocation(cfg.Timezone)
+	loc, err := time.LoadLocation(cfg.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load timezone %s: %w", cfg.Timezone, err)
+	}
 
 	// Connect to MySQL server without database name to create database if needed
 	mysqlConfigWithoutDB := &mysqlDriver.Config{
@@ -73,7 +76,10 @@ func NewDB(cfg config.DatabaseConfig, logger logger.Interface, gormConfig *gorm.
 	if err != nil {
 		return nil, fmt.Errorf("failed to get temp sql db: %w", err)
 	}
-	tempSqlDB.Close()
+	if closeErr := tempSqlDB.Close(); closeErr != nil {
+		// Log but don't fail — the temp connection is no longer needed
+		fmt.Printf("warning: failed to close temp db connection: %v\n", closeErr)
+	}
 
 	// Now connect with database name in DSN
 	mysqlConfigWithDB := &mysqlDriver.Config{

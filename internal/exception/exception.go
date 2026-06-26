@@ -15,8 +15,11 @@ type Exception struct {
 
 var codes = map[int]struct{}{}
 
-// register is the internal function to register an exception code
-func register(statusCode int, code int, message string, i18nMsg i18n.Text) *Exception {
+// mustRegister registers an exception code and panics if it already exists.
+// Panicking is intentional here: exception codes are defined in package-level var
+// declarations during init, so duplicate codes indicate a programming error that
+// must be caught at startup. This follows the Go MustXxx convention.
+func mustRegister(statusCode int, code int, message string, i18nMsg i18n.Text) *Exception {
 	if _, ok := codes[code]; ok {
 		panic(fmt.Sprintf("Exception code %d already exists", code))
 	}
@@ -25,7 +28,7 @@ func register(statusCode int, code int, message string, i18nMsg i18n.Text) *Exce
 }
 
 func NewException(statusCode int, code int, message string, i18nMsg i18n.Text) *Exception {
-	return register(statusCode, code, message, i18nMsg)
+	return mustRegister(statusCode, code, message, i18nMsg)
 }
 
 func (e *Exception) clone() *Exception {

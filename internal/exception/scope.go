@@ -20,5 +20,5 @@ var (
 func (m *ExceptionScope) New(statusCode int, message string, i18nMsg i18n.Text) *Exception {
 	m.counter++
 	code := m.baseCode + m.counter
-	return register(statusCode, code, message, i18nMsg)
+	return mustRegister(statusCode, code, message, i18nMsg)
 }
