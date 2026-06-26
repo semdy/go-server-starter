@@ -1,0 +1,47 @@
+# 本地开发环境 — 仅启动依赖服务（MySQL + Redis）
+# Go 应用在宿主机通过 air 运行，代码修改即时生效。
+#
+# 启动方式:
+#   docker compose -f docker-compose.dev.yml up -d
+#   air
+#
+# 生产环境使用 docker-compose.yml（包含应用构建）。
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: go-starter-mysql-dev
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test_db
+      TZ: UTC
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_dev_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: go-starter-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass root --save 60 1 --loglevel warning
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "root", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql_dev_data:
+  redis_dev_data:

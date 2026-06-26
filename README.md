@@ -219,6 +219,23 @@ For development with hot reload, use [Air](https://github.com/cosmtrek/air):
 air
 ```
 
+### With Docker
+
+  1. startup docker compose
+  ``bash
+  docker compose -f docker-compose.dev.yml up -d
+  ```
+
+  2. startup Go app (hot reload, auto restart on code change)
+  ``bash
+  air
+  ```
+
+  3. stop docker compose
+  ``bash
+  docker compose -f docker-compose.dev.yml down
+  ```
+
 ## 📄 License
 
 This project is open-sourced software licensed under the [MIT license](LICENSE).
@@ -226,4 +243,3 @@ This project is open-sourced software licensed under the [MIT license](LICENSE).
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-

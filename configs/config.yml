@@ -11,11 +11,11 @@ jwt:
   tokenSecret: tokenSecret@123
   tokenExpires:
     web: 24h
-    desktop: 360h           # 15 * 24 hours
-    mobile: 360h            # 15 * 24 hours
-    chromeExtension: 720h   # 30 * 24 hours
-    api: 48h                # 2 * 24 hours
-    default: 24h            # 1 * 24 hours
+    desktop: 360h # 15 * 24 hours
+    mobile: 360h # 15 * 24 hours
+    chromeExtension: 720h # 30 * 24 hours
+    api: 48h # 2 * 24 hours
+    default: 24h # 1 * 24 hours
 
 database:
   host: localhost
@@ -47,8 +47,8 @@ asynQ:
 logger:
   level: info
   fileDir: ./logs
-  maxSize: 100        # MB
-  maxAge: 30          # days
+  maxSize: 100 # MB
+  maxAge: 30 # days
   maxBackups: 10
   compress: false
   consoleOutput: true

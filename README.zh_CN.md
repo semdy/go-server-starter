@@ -219,6 +219,23 @@ curl -H "Accept-Language: zh" http://localhost:8080/api/hello
 air
 ```
 
+### 日常开发流程
+
+  1. 启动依赖服务
+  ``bash
+  docker compose -f docker-compose.dev.yml up -d
+  ```
+
+  2. 启动 Go 应用（热重载，修改代码自动重启）
+  ``bash
+  air
+  ```
+
+  3. 开发完成后停止依赖服务
+  ``bash
+  docker compose -f docker-compose.dev.yml down
+  ```
+
 ## 📄 许可证
 
 本项目基于 [MIT 许可证](LICENSE) 开源。
@@ -226,4 +243,3 @@ air
 ## 🤝 贡献
 
 欢迎贡献代码！请随时提交 Pull Request。
-
