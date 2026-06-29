@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"go-server-starter/internal/constant"
@@ -16,6 +17,7 @@ import (
 
 	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
@@ -30,9 +32,10 @@ type UserRoleService interface {
 }
 
 type UserRoleServiceImpl struct {
-	repo   repo.Repo
-	redis  *redis.Client
-	logger *zap.Logger
+	repo    repo.Repo
+	redis   *redis.Client
+	logger  *zap.Logger
+	sfGroup singleflight.Group // deduplicates concurrent cache-miss DB queries
 }
 
 func NewUserRoleService(repo repo.Repo, redis *redis.Client, logger *zap.Logger) UserRoleService {
@@ -57,39 +60,83 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx *ctx.Context, uniCode st
 }
 
 func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx *ctx.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
-	dataStr, err := s.redis.Get(ctx.Ctx, constant.RedisKeyOfAuthRoles(uniCode)).Result()
-	if err != nil {
-		// 如果redis 非正常报错，则返回错误
-		if err != goredis.Nil {
-			s.logger.Error("get cached roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
-			return nil, exception.InternalServerError.Append(err.Error())
-		} else {
-			// 如果redis 正常报错（goredis.Nil），则获取数据库中的角色
-			roles, exc := s.GetRolesCodeByUniCode(ctx, uniCode)
-			if exc != nil {
-				return nil, exc
-			}
-			// 将角色转换为JSON
-			rolesJSON, err := json.Marshal(roles)
-			if err != nil {
-				s.logger.Error("marshal roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
-				return nil, exception.InternalServerError.Append(err.Error())
-			}
-			// 将角色缓存到redis
-			if err := s.redis.Set(ctx.Ctx, constant.RedisKeyOfAuthRoles(uniCode), rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); err != nil {
-				s.logger.Error("set cached roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
-				return nil, exception.InternalServerError.Append(err.Error())
-			}
-			return roles, nil
-		}
-	} else {
-		// 如果redis 正常返回，则将dataStr 反序列化为角色
+	cacheKey := constant.RedisKeyOfAuthRoles(uniCode)
+
+	dataStr, err := s.redis.Get(ctx.Ctx, cacheKey).Result()
+	if err == nil {
+		// Cache hit — deserialize and return
 		var roles []enum.RoleCode
 		if err := json.Unmarshal([]byte(dataStr), &roles); err != nil {
 			s.logger.Error("unmarshal roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
 		return roles, nil
+	}
+
+	// Cache miss (goredis.Nil) or Redis unavailable — fall through to DB
+	if !errors.Is(err, goredis.Nil) {
+		// Redis is unavailable — fall back to DB directly instead of returning 500
+		s.logger.Warn("redis unavailable, falling back to DB",
+			zap.String("uniCode", uniCode), zap.Error(err))
+		return s.GetRolesCodeByUniCode(ctx, uniCode)
+	}
+
+	// Cache miss — use singleflight to deduplicate concurrent requests
+	// Only one goroutine per uniCode queries DB and populates cache
+	result, sfErr, _ := s.sfGroup.Do(cacheKey, func() (any, error) {
+		roles, exc := s.GetRolesCodeByUniCode(ctx, uniCode)
+		if exc != nil {
+			return nil, exc // *exception.Exception implements error
+		}
+
+		// Populate cache (best-effort, don't fail on cache write error)
+		if rolesJSON, err := json.Marshal(roles); err == nil {
+			if setErr := s.redis.Set(ctx.Ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
+				s.logger.Warn("failed to set role cache", zap.String("uniCode", uniCode), zap.Error(setErr))
+			}
+		}
+		return roles, nil
+	})
+
+	if sfErr != nil {
+		// singleflight returned our *exception.Exception as an error
+		if exc, ok := sfErr.(*exception.Exception); ok {
+			return nil, exc
+		}
+		return nil, exception.InternalServerError.Append(sfErr.Error())
+	}
+
+	return result.([]enum.RoleCode), nil
+}
+
+// invalidateAllRoleCaches removes all role cache entries from Redis.
+// Called after any role mutation (create/update/delete) to prevent stale cache reads.
+func (s *UserRoleServiceImpl) invalidateAllRoleCaches(ctx context.Context) {
+	pattern := "auth:roles:*"
+	var cursor uint64
+	var totalDeleted int64
+
+	for {
+		keys, nextCursor, err := s.redis.Scan(ctx, cursor, pattern, 100).Result()
+		if err != nil {
+			s.logger.Warn("failed to scan role cache keys for invalidation", zap.Error(err))
+			return
+		}
+		if len(keys) > 0 {
+			deleted, err := s.redis.Del(ctx, keys...).Result()
+			if err != nil {
+				s.logger.Warn("failed to delete role cache keys", zap.Error(err))
+			}
+			totalDeleted += deleted
+		}
+		cursor = nextCursor
+		if cursor == 0 {
+			break
+		}
+	}
+
+	if totalDeleted > 0 {
+		s.logger.Info("invalidated role caches", zap.Int64("count", totalDeleted))
 	}
 }
 
@@ -156,6 +203,10 @@ func (s *UserRoleServiceImpl) Create(ctx *ctx.Context, params dto.UserRoleCreate
 	if err := s.repo.UserRole().Create(ctx.Ctx, role); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
+
+	// Invalidate role caches so any cached role lists reflect the new role
+	s.invalidateAllRoleCaches(ctx.Ctx)
+
 	return toUserRoleResDto(role), nil
 }
 
@@ -182,6 +233,10 @@ func (s *UserRoleServiceImpl) Update(ctx *ctx.Context, id uint64, params dto.Use
 	if err := s.repo.UserRole().UpdateByZeroFields(ctx.Ctx, id, role); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
+
+	// Invalidate caches — role code or enabled status may have changed
+	s.invalidateAllRoleCaches(ctx.Ctx)
+
 	return toUserRoleResDto(role), nil
 }
 
@@ -189,5 +244,9 @@ func (s *UserRoleServiceImpl) Delete(ctx *ctx.Context, id uint64) *exception.Exc
 	if err := s.repo.UserRole().SoftDelete(ctx.Ctx, id); err != nil {
 		return nil
 	}
+
+	// Invalidate caches — deleted role should no longer appear in user role lists
+	s.invalidateAllRoleCaches(ctx.Ctx)
+
 	return nil
 }

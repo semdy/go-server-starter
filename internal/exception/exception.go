@@ -42,7 +42,17 @@ func (e *Exception) Append(details ...string) *Exception {
 	return e
 }
 
-func (e *Exception) Is(err *Exception) bool {
+// Error implements the error interface so *Exception can be used with standard
+// error-returning patterns (e.g. singleflight.Do).
+func (e *Exception) Error() string {
+	if e == nil {
+		return ""
+	}
+	return fmt.Sprintf("[%d] %s", e.Code, e.Message)
+}
+
+// CodeEquals returns true if both exceptions share the same business error code.
+func (e *Exception) CodeEquals(err *Exception) bool {
 	if e == nil || err == nil {
 		return false
 	}
