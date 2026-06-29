@@ -6,6 +6,7 @@ import (
 	"go-server-starter/pkg/jwt"
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/snowflake"
+	"go-server-starter/pkg/taskq"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -29,7 +30,7 @@ type ServiceImpl struct {
 	authService     AuthService
 }
 
-func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, logger *zap.Logger) Service {
+func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, taskqClient *taskq.Client, logger *zap.Logger) Service {
 	return &ServiceImpl{
 		db:              db,
 		config:          config,
@@ -39,7 +40,7 @@ func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.C
 		logger:          logger,
 		userService:     NewUserService(repo, redis, logger),
 		userRoleService: NewUserRoleService(repo, redis, logger),
-		authService:     NewAuthService(repo, jwt, logger),
+		authService:     NewAuthService(repo, jwt, taskqClient, logger),
 	}
 }
 

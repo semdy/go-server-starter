@@ -266,6 +266,43 @@ migration.Down(sqlDB)  // roll back the last migration
 
 `goose` tracks applied versions in a `goose_db_version` table, ensuring migrations are never run twice and supporting full rollback.
 
+## 📨 Task Queue (Async Jobs)
+
+[Asynq](https://github.com/hibiken/asynq) provides Redis-backed task processing. Workers start alongside the HTTP server, and tasks are enqueued via `pkg/taskq`.
+
+### Adding a new task
+
+1. Define a task type constant and payload struct in `pkg/taskq/tasks.go`
+2. Create a constructor function (`NewXxxTask`)
+3. Write a handler function (`HandleXxx`)
+4. Register it in `app.go`: `taskqServer.HandleFunc(taskq.TaskXxx, taskq.HandleXxx)`
+5. Enqueue from your service:
+
+```go
+task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
+    UserUniCode: user.UniCode,
+    Email:       user.Email,
+})
+s.taskq.Enqueue(ctx, task, taskq.RetryByType(taskq.TaskEmailWelcome)...)
+```
+
+### Retry & alerting
+
+- **Per-task retry**: `RetryByType(taskType)` returns `MaxRetry` + `Timeout` tuned per task.
+- **Exhausted retries**: `ErrorHandler` logs the failure and calls the `Alerter` interface.
+- **Alerter**: pluggable — implement the `Alerter` interface to send Slack, webhook, or write to a dead-letter table. Pass your implementation to `taskq.NewServer(..., alerter)`. Default is no-op.
+
+### Graceful shutdown
+
+The task worker waits for in-flight tasks to complete before the process exits:
+
+```go
+a.taskqServer.Shutdown()  // drain then stop
+a.taskqClient.Close()     // close Redis connection
+```
+
+Tasks are archived by Asynq after retries are exhausted and can be inspected via `asynqmon`.
+
 ## 🛠️ Development
 
 ### Generate Code

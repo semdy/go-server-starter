@@ -18,6 +18,7 @@ import (
 	"go-server-starter/pkg/logger"
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/snowflake"
+	"go-server-starter/pkg/taskq"
 	"go-server-starter/pkg/translator"
 	"go-server-starter/pkg/validator"
 	"net/http"
@@ -42,7 +43,9 @@ type App struct {
 	handler    handler.Handler
 	repo       repo.Repo
 	service    service.Service
-	seed       seed.Seed
+	seed        seed.Seed
+	taskqClient *taskq.Client
+	taskqServer *taskq.Server
 }
 
 func NewApp(config *config.Config, logger *zap.Logger) *App {
@@ -119,6 +122,32 @@ func (a *App) Start() error {
 	}
 	a.redis = redis
 
+	// 初始化任务队列
+	taskqClient, err := taskq.NewClient(a.config.AsynQ, a.logger.Named("TASKQ-CLIENT"))
+	if err != nil {
+		return fmt.Errorf("init taskq client: %w", err)
+	}
+	a.taskqClient = taskqClient
+
+	taskqServer := taskq.NewServer(a.config.AsynQ, taskq.ServerConfig{
+		Concurrency: a.config.AsynQ.Concurrency,
+		Queues: map[string]int{
+			"default": 3,
+			"low":     1,
+		},
+	}, a.logger, nil) // nil alerter = default no-op
+
+	// 注册任务处理器（示例：欢迎邮件）
+	taskqServer.HandleFunc(taskq.TaskEmailWelcome, taskq.HandleEmailWelcome)
+
+	// 启动后台 worker
+	go func() {
+		if err := taskqServer.Start(); err != nil {
+			a.logger.Error("taskq worker stopped with error", zap.Error(err))
+		}
+	}()
+	a.taskqServer = taskqServer
+
 	// snowflake
 	snowflake, err := snowflake.NewSnowflake(a.config.Server.SnowflakeNode)
 	if err != nil {
@@ -157,6 +186,7 @@ func (a *App) Start() error {
 		a.redis,
 		a.snowflake,
 		a.repo,
+		a.taskqClient,
 		a.logger.Named("SERVICE"),
 	)
 	// 初始化auth
@@ -215,6 +245,15 @@ func (a *App) Shutdown() error {
 	if a.redis != nil {
 		if err := a.redis.Close(); err != nil {
 			a.logger.Error("Failed to close redis", zap.Error(err))
+		}
+	}
+
+	if a.taskqServer != nil {
+		a.taskqServer.Shutdown()
+	}
+	if a.taskqClient != nil {
+		if err := a.taskqClient.Close(); err != nil {
+			a.logger.Error("Failed to close taskq client", zap.Error(err))
 		}
 	}
 

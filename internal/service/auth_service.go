@@ -9,6 +9,7 @@ import (
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/jwt"
+	"go-server-starter/pkg/taskq"
 	"strings"
 
 	"go.uber.org/zap"
@@ -23,13 +24,15 @@ type AuthService interface {
 type AuthServiceImpl struct {
 	repo   repo.Repo
 	jwt    *jwt.JWT
+	taskq  *taskq.Client
 	logger *zap.Logger
 }
 
-func NewAuthService(repo repo.Repo, jwt *jwt.JWT, logger *zap.Logger) AuthService {
+func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, logger *zap.Logger) AuthService {
 	return &AuthServiceImpl{
 		repo:   repo,
 		jwt:    jwt,
+		taskq:  taskq,
 		logger: logger,
 	}
 }
@@ -84,6 +87,19 @@ func (s *AuthServiceImpl) loginOrRegister(
 		}
 		if err := tx.Commit().Error; err != nil {
 			return nil, exception.InternalServerError.Append(err.Error())
+		}
+
+		// Enqueue welcome email for new user (fire-and-forget)
+		if s.taskq != nil && user.Email != "" {
+			task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
+				UserUniCode: user.UniCode,
+				Email:       user.Email,
+			})
+			if task != nil {
+				if _, err := s.taskq.Enqueue(ctx, task, taskq.RetryByType(taskq.TaskEmailWelcome)...); err != nil {
+					s.logger.Warn("failed to enqueue welcome email", zap.Error(err))
+				}
+			}
 		}
 	}
 

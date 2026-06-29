@@ -80,6 +80,7 @@ func TestLoginByMobileAndCode_InvalidCode(t *testing.T) {
 	svc := NewAuthService(
 		&mockRepo{userRepo: &stubUserRepo{}, userRoleRepo: &stubUserRoleRepo{}},
 		testJWT(),
+		nil, // taskq client not needed for this test
 		zap.NewNop(),
 	)
 
@@ -101,6 +102,7 @@ func TestLoginByEmailAndCode_InvalidCode(t *testing.T) {
 	svc := NewAuthService(
 		&mockRepo{userRepo: &stubUserRepo{}, userRoleRepo: &stubUserRoleRepo{}},
 		testJWT(),
+		nil, // taskq client not needed for this test
 		zap.NewNop(),
 	)
 

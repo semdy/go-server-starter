@@ -266,6 +266,43 @@ migration.Down(sqlDB)  // 回滚最近一次迁移
 
 goose 在 `goose_db_version` 表中记录已执行的迁移版本，确保不重复执行，并支持完整回滚。
 
+## 📨 任务队列（异步任务）
+
+基于 [Asynq](https://github.com/hibiken/asynq)，以 Redis 为存储后端。Worker 与 HTTP 服务同时启动，通过 `pkg/taskq` 入队和消费任务。
+
+### 添加新任务
+
+1. 在 `pkg/taskq/tasks.go` 中定义任务类型常量和 payload struct
+2. 编写构造函数（`NewXxxTask`）
+3. 编写处理函数（`HandleXxx`）
+4. 在 `app.go` 中注册：`taskqServer.HandleFunc(taskq.TaskXxx, taskq.HandleXxx)`
+5. 在业务代码中入队：
+
+```go
+task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
+    UserUniCode: user.UniCode,
+    Email:       user.Email,
+})
+s.taskq.Enqueue(ctx, task, taskq.RetryByType(taskq.TaskEmailWelcome)...)
+```
+
+### 重试与告警
+
+- **按任务定制重试**：`RetryByType(taskType)` 返回该任务专属的 `MaxRetry` 和 `Timeout`。
+- **重试耗尽**：`ErrorHandler` 记录错误日志，并调用 `Alerter` 接口。
+- **Alerter 接口**：可插拔——实现 `Alerter` 接口即可接入 Slack、Webhook 或写入死信表。通过 `taskq.NewServer(..., alerter)` 传入，默认不告警。
+
+### 优雅关闭
+
+Worker 会等待正在执行的任务完成后才退出：
+
+```go
+a.taskqServer.Shutdown()  // 排空后停止
+a.taskqClient.Close()     // 关闭 Redis 连接
+```
+
+重试耗尽后任务被 Asynq 归档，可通过 `asynqmon` 查看。
+
 ## 🛠️ 开发指南
 
 ### 代码生成
