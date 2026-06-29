@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE user_roles (
     id BIGINT UNSIGNED PRIMARY KEY,
     created_at DATETIME(3) NULL,
@@ -9,3 +10,6 @@ CREATE TABLE user_roles (
     UNIQUE INDEX idx_code (code),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- +goose Down
+DROP TABLE IF EXISTS user_roles;

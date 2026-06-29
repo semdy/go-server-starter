@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE dead_letters (
     id BIGINT UNSIGNED PRIMARY KEY,
     created_at DATETIME(3) NULL,
@@ -21,3 +22,6 @@ CREATE TABLE dead_letters (
     INDEX idx_is_retried (is_retried),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- +goose Down
+DROP TABLE IF EXISTS dead_letters;

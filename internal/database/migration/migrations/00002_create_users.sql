@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE users (
     id BIGINT UNSIGNED PRIMARY KEY,
     created_at DATETIME(3) NULL,
@@ -19,3 +20,6 @@ CREATE TABLE users (
     INDEX idx_nickname (nickname),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- +goose Down
+DROP TABLE IF EXISTS users;

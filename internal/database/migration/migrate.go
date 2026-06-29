@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/pressly/goose/v3"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 //go:embed migrations/*.sql
@@ -15,6 +16,9 @@ var embedMigrations embed.FS
 func Run(db *sql.DB) error {
 	goose.SetBaseFS(embedMigrations)
 
+	if err := goose.SetDialect("mysql"); err != nil {
+		return fmt.Errorf("set dialect: %w", err)
+	}
 	if err := goose.Up(db, "migrations"); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
