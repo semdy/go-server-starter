@@ -85,9 +85,9 @@ Route-group middleware: `jwt.JWT()` (token validation + auto-refresh when < 1/3 
 ### Database
 
 - MySQL via GORM; database is auto-created (`CREATE DATABASE IF NOT EXISTS`) on connect.
-- AutoMigrate runs on startup for models listed in `app.go` (`UserRole`, `User`). Add new models there to auto-migrate.
+- **Migrations** use [goose](https://github.com/pressly/goose) with embedded SQL files in `internal/database/migration/migrations/`. Run on startup via `migration.Run(sqlDB)`. Each migration has `.up.sql` and `.down.sql` for rollback. GORM AutoMigrate is no longer used.
 - Seed data runs after migration: inserts 6 default user roles (idempotent — skips existing).
-- No migration versioning; for production schema changes, consider introducing goose or golang-migrate.
+- To add a new table: create a new goose migration pair (`0000x_name.up.sql` + `0000x_name.down.sql`) in the migrations directory. The `embed` directive picks them up automatically — no other wiring needed.
 
 ### Config Loading
 

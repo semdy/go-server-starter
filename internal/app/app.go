@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"go-server-starter/internal/config"
 	"go-server-starter/internal/enum"
+	"go-server-starter/internal/database/migration"
 	"go-server-starter/internal/handler"
 	"go-server-starter/internal/middleware"
-	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/internal/router"
 	"go-server-starter/internal/seed"
@@ -103,13 +103,13 @@ func (a *App) Start() error {
 	}
 	a.db = db
 
-	// auto migrate
-	err = db.AutoMigrate(
-		&model.UserRole{},
-		&model.User{},
-	)
+	// run database migrations (goose)
+	sqlDB, err := db.DB.DB()
 	if err != nil {
-		return err
+		return fmt.Errorf("get sql.DB: %w", err)
+	}
+	if err := migration.Run(sqlDB); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
 	}
 
 	// 初始化redis

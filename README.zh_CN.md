@@ -203,6 +203,41 @@ curl -H "Accept-Language: zh" http://localhost:8080/api/hello
 - **输出方式**: 控制台（开发环境）+ 文件（info.log, error.log）
 - **日志轮转**: 可配置最大大小、保存天数和备份数量
 
+## 🗄️ 数据库迁移
+
+使用 [goose](https://github.com/pressly/goose) 管理数据库迁移。所有迁移文件通过 `embed` 打包进二进制，启动时自动执行——生产环境无需额外 CLI 工具。
+
+### 迁移文件
+
+位于 `internal/database/migration/migrations/`，每个迁移包含 `.up.sql` 和 `.down.sql` 一对文件：
+
+```
+migrations/
+├── 00001_create_user_roles.up.sql
+├── 00001_create_user_roles.down.sql
+├── 00002_create_users.up.sql
+├── 00002_create_users.down.sql
+├── 00003_create_user_role_refs.up.sql
+└── 00003_create_user_role_refs.down.sql
+```
+
+### 添加新迁移
+
+```bash
+# 生成空迁移文件
+goose -dir internal/database/migration/migrations create add_new_table sql
+```
+
+在生成的文件中编写 DDL，重启服务即可——`migrate.go` 中的 `embed` 指令会自动发现新文件，无需修改 Go 代码。
+
+### 回滚
+
+```go
+migration.Down(sqlDB)  // 回滚最近一次迁移
+```
+
+goose 在 `goose_db_version` 表中记录已执行的迁移版本，确保不重复执行，并支持完整回滚。
+
 ## 🛠️ 开发指南
 
 ### 代码生成
