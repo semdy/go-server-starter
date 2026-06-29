@@ -241,28 +241,38 @@ Logs are structured with Zap and automatically rotated:
 
 Database migrations are managed by [goose](https://github.com/pressly/goose). All migration files are embedded in the binary and run automatically on startup — no external CLI required in production.
 
-### Migration files
+### Migration format
 
-Located at `internal/database/migration/migrations/`, each migration is a pair of `.up.sql` and `.down.sql` files:
+Each migration is a single `.sql` file with `-- +goose Up` / `-- +goose Down` markers:
 
 ```
-migrations/
-├── 00001_create_user_roles.up.sql
-├── 00001_create_user_roles.down.sql
-├── 00002_create_users.up.sql
-├── 00002_create_users.down.sql
-├── 00003_create_user_role_refs.up.sql
-└── 00003_create_user_role_refs.down.sql
+internal/database/migration/migrations/
+├── 00001_create_user_roles.sql
+├── 00002_create_users.sql
+├── 00003_create_user_role_refs.sql
+└── 00004_create_dead_letters.sql
 ```
 
-### Adding a new migration
+### Adding a new table
 
 ```bash
-# Generate empty migration files
 goose -dir internal/database/migration/migrations create add_new_table sql
 ```
 
-Write your DDL in the generated file, then restart the server — migrations run on every startup. The `embed` directive in `migrate.go` picks up new files automatically with zero Go code changes.
+Write DDL in the generated file, restart — migrations run on startup.
+
+### Adding indexes or constraints
+
+Create a new migration with `ALTER TABLE`:
+
+```sql
+-- +goose Up
+ALTER TABLE users ADD INDEX idx_status (status);
+-- +goose Down
+ALTER TABLE users DROP INDEX idx_status;
+```
+
+GORM struct tags (`gorm:"index"`, `gorm:"uniqueIndex"`) serve as documentation after goose takes over DDL. Indexes and unique constraints are defined exclusively in migration SQL.
 
 ### Rollback
 
@@ -270,7 +280,7 @@ Write your DDL in the generated file, then restart the server — migrations run
 migration.Down(sqlDB)  // roll back the last migration
 ```
 
-`goose` tracks applied versions in a `goose_db_version` table, ensuring migrations are never run twice and supporting full rollback.
+`goose_db_version` table tracks applied versions — never run twice, full rollback support.
 
 ## 📱 Verification Codes & Notifications
 

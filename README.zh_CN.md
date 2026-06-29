@@ -239,28 +239,38 @@ curl -H "Accept-Language: zh" http://localhost:8080/api/hello
 
 使用 [goose](https://github.com/pressly/goose) 管理数据库迁移。所有迁移文件通过 `embed` 打包进二进制，启动时自动执行——生产环境无需额外 CLI 工具。
 
-### 迁移文件
+### 迁移格式
 
-位于 `internal/database/migration/migrations/`，每个迁移包含 `.up.sql` 和 `.down.sql` 一对文件：
+每个迁移是单个 `.sql` 文件，用 `-- +goose Up` / `-- +goose Down` 标记上下两部分：
 
 ```
-migrations/
-├── 00001_create_user_roles.up.sql
-├── 00001_create_user_roles.down.sql
-├── 00002_create_users.up.sql
-├── 00002_create_users.down.sql
-├── 00003_create_user_role_refs.up.sql
-└── 00003_create_user_role_refs.down.sql
+internal/database/migration/migrations/
+├── 00001_create_user_roles.sql
+├── 00002_create_users.sql
+├── 00003_create_user_role_refs.sql
+└── 00004_create_dead_letters.sql
 ```
 
-### 添加新迁移
+### 添加新表
 
 ```bash
-# 生成空迁移文件
 goose -dir internal/database/migration/migrations create add_new_table sql
 ```
 
-在生成的文件中编写 DDL，重启服务即可——`migrate.go` 中的 `embed` 指令会自动发现新文件，无需修改 Go 代码。
+在生成的文件中编写 DDL，重启即可。
+
+### 添加索引或约束
+
+新建一个迁移，用 `ALTER TABLE`：
+
+```sql
+-- +goose Up
+ALTER TABLE users ADD INDEX idx_status (status);
+-- +goose Down
+ALTER TABLE users DROP INDEX idx_status;
+```
+
+GORM struct tag（`gorm:"index"`、`gorm:"uniqueIndex"`）在 goose 接管 DDL 后仅作文档用途。索引和唯一约束**只在迁移 SQL 中定义**。
 
 ### 回滚
 
@@ -268,7 +278,7 @@ goose -dir internal/database/migration/migrations create add_new_table sql
 migration.Down(sqlDB)  // 回滚最近一次迁移
 ```
 
-goose 在 `goose_db_version` 表中记录已执行的迁移版本，确保不重复执行，并支持完整回滚。
+`goose_db_version` 表记录已执行版本——不重复执行，支持完整回滚。
 
 ## 📱 验证码与通知
 
