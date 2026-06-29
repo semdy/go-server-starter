@@ -202,11 +202,7 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/role` | Create role | admin+ |
 | PUT | `/api/role/{id}` | Update role | admin+ |
 | DELETE | `/api/role/{id}` | Delete role (soft) | admin+ |
-| GET | `/api/admin/tasks/archived` | List dead-letter tasks (Redis) | super_admin |
-| POST | `/api/admin/tasks/archived/run` | Retry one dead-letter task | super_admin |
-| POST | `/api/admin/tasks/archived/run-all` | Retry all dead-letter tasks | super_admin |
-| DELETE | `/api/admin/tasks/archived` | Delete one dead-letter task | super_admin |
-| GET | `/api/admin/dead-letters` | List dead letters (DB) | super_admin |
+| GET | `/api/admin/dead-letters` | List dead letters | super_admin |
 | POST | `/api/admin/dead-letters/retry` | Retry one dead letter | super_admin |
 | POST | `/api/admin/dead-letters/retry-all` | Retry all by type | super_admin |
 | DELETE | `/api/admin/dead-letters` | Delete dead letter | super_admin |
@@ -336,7 +332,7 @@ s.taskq.EnqueueUnique(ctx, task, uniqueKey, 24*time.Hour,
 
 ### Monitoring & dead-letter
 
-**Dashboard**: install [asynqmon](https://github.com/hibiken/asynqmon) and point it at the AsynQ Redis DB:
+**Dashboard**: install [asynqmon](https://github.com/hibiken/asynqmon) to inspect Redis queues in real time:
 
 ```bash
 go install github.com/hibiken/asynq/tools/asynqmon@latest
@@ -344,13 +340,12 @@ asynqmon --redis-addr=localhost:6379 --redis-password=root --redis-db=1
 # open http://localhost:8081
 ```
 
-**Manual retry** of archived (retry-exhausted) tasks via `taskq.Client`:
+**Dead-letter persistence**: retry-exhausted tasks are automatically written to MySQL (`dead_letters` table) via the `Alerter`. List, retry, or delete via admin API:
 
-```go
-tasks, _ := client.ListArchivedTasks("default")
-client.RunArchivedTask("default", taskID)   // retry one
-client.RunAllArchivedTasks("default")       // retry all
-client.DeleteArchivedTask("default", taskID) // delete permanently
+```
+GET  /api/admin/dead-letters?taskType=email:welcome
+POST /api/admin/dead-letters/retry        {"id": 5}
+POST /api/admin/dead-letters/retry-all?taskType=email:welcome
 ```
 
 ### Graceful shutdown

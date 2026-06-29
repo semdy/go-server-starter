@@ -2,7 +2,6 @@ package handler
 
 import (
 	"go-server-starter/internal/service"
-	"go-server-starter/pkg/taskq"
 
 	"go.uber.org/zap"
 )
@@ -12,7 +11,6 @@ type Handler interface {
 	User() UserHandler
 	UserRole() UserRoleHandler
 	Auth() AuthHandler
-	Task() TaskHandler
 	DeadLetter() DeadLetterHandler
 }
 
@@ -22,42 +20,22 @@ type HandlerImpl struct {
 	userHandler       UserHandler
 	userRoleHandler   UserRoleHandler
 	authHandler       AuthHandler
-	taskHandler       TaskHandler
 	deadLetterHandler DeadLetterHandler
 }
 
-func NewHandler(service service.Service, taskqClient *taskq.Client, logger *zap.Logger) Handler {
+func NewHandler(service service.Service, logger *zap.Logger) Handler {
 	return &HandlerImpl{
 		logger:            logger,
 		helloHandler:      NewHelloHandler(logger),
 		userHandler:       NewUserHandler(logger, service),
 		userRoleHandler:   NewUserRoleHandler(logger, service),
 		authHandler:       NewAuthHandler(logger, service),
-		taskHandler:       NewTaskHandler(logger, taskqClient),
 		deadLetterHandler: NewDeadLetterHandler(logger, service),
 	}
 }
 
-func (h *HandlerImpl) Hello() HelloHandler {
-	return h.helloHandler
-}
-
-func (h *HandlerImpl) User() UserHandler {
-	return h.userHandler
-}
-
-func (h *HandlerImpl) UserRole() UserRoleHandler {
-	return h.userRoleHandler
-}
-
-func (h *HandlerImpl) Auth() AuthHandler {
-	return h.authHandler
-}
-
-func (h *HandlerImpl) Task() TaskHandler {
-	return h.taskHandler
-}
-
-func (h *HandlerImpl) DeadLetter() DeadLetterHandler {
-	return h.deadLetterHandler
-}
+func (h *HandlerImpl) Hello() HelloHandler           { return h.helloHandler }
+func (h *HandlerImpl) User() UserHandler             { return h.userHandler }
+func (h *HandlerImpl) UserRole() UserRoleHandler     { return h.userRoleHandler }
+func (h *HandlerImpl) Auth() AuthHandler             { return h.authHandler }
+func (h *HandlerImpl) DeadLetter() DeadLetterHandler { return h.deadLetterHandler }

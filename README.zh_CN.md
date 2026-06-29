@@ -200,11 +200,7 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/role` | 创建角色 | admin+ |
 | PUT | `/api/role/{id}` | 更新角色 | admin+ |
 | DELETE | `/api/role/{id}` | 删除角色（软删除） | admin+ |
-| GET | `/api/admin/tasks/archived` | 死信任务列表（Redis） | super_admin |
-| POST | `/api/admin/tasks/archived/run` | 重试单个死信任务 | super_admin |
-| POST | `/api/admin/tasks/archived/run-all` | 重试全部死信任务 | super_admin |
-| DELETE | `/api/admin/tasks/archived` | 删除死信任务 | super_admin |
-| GET | `/api/admin/dead-letters` | 死信列表（DB） | super_admin |
+| GET | `/api/admin/dead-letters` | 死信列表 | super_admin |
 | POST | `/api/admin/dead-letters/retry` | 重试单条死信 | super_admin |
 | POST | `/api/admin/dead-letters/retry-all` | 按类型批量重试 | super_admin |
 | DELETE | `/api/admin/dead-letters` | 删除死信 | super_admin |
@@ -334,7 +330,7 @@ s.taskq.EnqueueUnique(ctx, task, uniqueKey, 24*time.Hour,
 
 ### 监控与死信管理
 
-**控制台**：安装 [asynqmon](https://github.com/hibiken/asynqmon)，指向 AsynQ 的 Redis DB：
+**控制台**：安装 [asynqmon](https://github.com/hibiken/asynqmon) 实时查看 Redis 队列状态：
 
 ```bash
 go install github.com/hibiken/asynq/tools/asynqmon@latest
@@ -342,13 +338,12 @@ asynqmon --redis-addr=localhost:6379 --redis-password=root --redis-db=1
 # 浏览器打开 http://localhost:8081
 ```
 
-**手动重试**已归档（重试耗尽）的任务，通过 `taskq.Client`：
+**死信落库**：重试耗尽后通过 `Alerter` 自动写入 MySQL `dead_letters` 表。可通过 admin API 查询、重试或删除：
 
-```go
-tasks, _ := client.ListArchivedTasks("default")
-client.RunArchivedTask("default", taskID)   // 重试单个
-client.RunAllArchivedTasks("default")       // 全部重试
-client.DeleteArchivedTask("default", taskID) // 永久删除
+```
+GET  /api/admin/dead-letters?taskType=email:welcome
+POST /api/admin/dead-letters/retry        {"id": 5}
+POST /api/admin/dead-letters/retry-all?taskType=email:welcome
 ```
 
 ### 优雅关闭

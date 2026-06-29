@@ -10,11 +10,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// Client wraps an Asynq client with logging, dedup, and dead-letter inspection.
+// Client wraps an Asynq client with logging and deduplication.
 type Client struct {
 	*asynq.Client
-	inspector *asynq.Inspector
-	logger    *zap.Logger
+	logger *zap.Logger
 }
 
 // NewClient creates a new Asynq client connected to the configured Redis.
@@ -25,9 +24,8 @@ func NewClient(cfg config.AsynQConfig, logger *zap.Logger) (*Client, error) {
 		DB:       cfg.RedisConfig.DB,
 	}
 	return &Client{
-		Client:    asynq.NewClient(redisOpt),
-		inspector: asynq.NewInspector(redisOpt),
-		logger:    logger,
+		Client: asynq.NewClient(redisOpt),
+		logger: logger,
 	}, nil
 }
 
@@ -49,37 +47,8 @@ func (c *Client) Enqueue(ctx context.Context, task *asynq.Task, opts ...asynq.Op
 	return info, nil
 }
 
-// EnqueueUnique enqueues a task with deduplication. Tasks with the same
-// (type, uniqueKey) within ttl will be deduplicated — safe to call multiple times.
+// EnqueueUnique enqueues a task with deduplication.
 func (c *Client) EnqueueUnique(ctx context.Context, task *asynq.Task, uniqueKey string, ttl time.Duration, opts ...asynq.Option) (*asynq.TaskInfo, error) {
 	opts = append(opts, asynq.TaskID(uniqueKey), asynq.Unique(ttl))
 	return c.Enqueue(ctx, task, opts...)
-}
-
-// Close closes both the client and inspector.
-func (c *Client) Close() error {
-	c.inspector.Close()
-	return c.Client.Close()
-}
-
-// ----- Dead-letter (archived task) inspection -----
-
-// ListArchivedTasks returns archived (retry-exhausted) tasks from the given queue.
-func (c *Client) ListArchivedTasks(queue string) ([]*asynq.TaskInfo, error) {
-	return c.inspector.ListArchivedTasks(queue)
-}
-
-// RunArchivedTask re-enqueues a single archived task for immediate retry.
-func (c *Client) RunArchivedTask(queue, taskID string) error {
-	return c.inspector.RunTask(queue, taskID)
-}
-
-// RunAllArchivedTasks re-enqueues all archived tasks in the given queue.
-func (c *Client) RunAllArchivedTasks(queue string) (int, error) {
-	return c.inspector.RunAllArchivedTasks(queue)
-}
-
-// DeleteArchivedTask permanently deletes an archived task.
-func (c *Client) DeleteArchivedTask(queue, taskID string) error {
-	return c.inspector.DeleteTask(queue, taskID)
 }

@@ -38,10 +38,7 @@ func (r *Router) SetupRoutes() {
 	// UserRole - 角色管理（管理员）
 	r.SetupUserRoleRoutes()
 
-	// Admin Tasks - 死信队列管理（Redis）
-	r.SetupAdminTaskRoutes()
-
-	// Admin DeadLetters - 死信记录管理（MySQL，含重试）
+	// Admin DeadLetters - 死信管理（MySQL 落库 + 重试）
 	r.SetupDeadLetterRoutes()
 
 	// Swagger API 文档
