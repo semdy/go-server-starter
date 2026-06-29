@@ -44,6 +44,10 @@ var DefaultConfig = Config{
 		Password: "", // MUST be set via environment variable or config file
 		DB:       0,
 	},
+	AlibabaCloud: AlibabaCloudConfig{
+		AccessKeyID:     "", // MUST be set via environment variable or config file
+		AccessKeySecret: "", // MUST be set via environment variable or config file
+	},
 	AsynQ: AsynQConfig{
 		RedisConfig: RedisConfig{
 			Host:     "localhost",

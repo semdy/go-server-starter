@@ -270,6 +270,35 @@ migration.Down(sqlDB)  // 回滚最近一次迁移
 
 goose 在 `goose_db_version` 表中记录已执行的迁移版本，确保不重复执行，并支持完整回滚。
 
+## 📱 验证码与通知
+
+验证码存储在 Redis 中，5 分钟有效期 + 60 秒重复请求冷却。发送通过任务队列异步完成。
+
+### 流程
+
+```
+POST /api/auth/send-sms-code  →  生成 6 位验证码  →  Redis SETEX  →  taskq.EnqueueUnique  →  阿里云短信
+POST /api/auth/login/mobile   →  Redis GET 比对    →  匹配成功 DEL  →  JWT token
+```
+
+### 阿里云集成
+
+`pkg/notify/` 提供可插拔的 `SmsSender` 和 `EmailSender` 接口。阿里云实现（`AlibabaSmsSender`、`AlibabaEmailSender`）在 `app.go` 中注入。替换服务商只需实现接口并修改注入代码。
+
+本地开发使用 `LogSender`（仅打印日志），无需阿里云凭证。
+
+### 邮件模板
+
+模板文件通过 `embed.FS` 打包进二进制。欢迎邮件模板位于 `pkg/notify/template/templates/welcome_email.html`。新增模板只需在该目录添加 `.html` 文件即可自动识别。
+
+渲染模板：
+
+```go
+import notifytmpl "go-server-starter/pkg/notify/template"
+
+html, _ := notifytmpl.GetEngine().Render("welcome_email.html", data)
+```
+
 ## 📨 任务队列（异步任务）
 
 基于 [Asynq](https://github.com/hibiken/asynq)，以 Redis 为存储后端。Worker 与 HTTP 服务同时启动，通过 `pkg/taskq` 入队和消费任务。

@@ -90,3 +90,20 @@ type AsynQConfig struct {
 	RedisConfig RedisConfig `koanf:"redisConfig"` // Redis配置
 	Concurrency int         `koanf:"concurrency"` // 并发数
 }
+
+type AlibabaCloudConfig struct {
+	AccessKeyID     string          `koanf:"accessKeyId"`
+	AccessKeySecret string          `koanf:"accessKeySecret"`
+	SMS             SMSConfig       `koanf:"sms"`
+	Email           EmailConfig     `koanf:"email"`
+}
+
+type SMSConfig struct {
+	SignName     string `koanf:"signName"`     // 短信签名
+	TemplateCode string `koanf:"templateCode"` // 短信模板代码
+}
+
+type EmailConfig struct {
+	FromAddress string `koanf:"fromAddress"` // 发件人地址
+	FromName    string `koanf:"fromName"`    // 发件人名称
+}

@@ -190,6 +190,8 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | GET | `/api/hello` | Health check | No |
+| POST | `/api/auth/send-sms-code` | Send SMS verification code | No |
+| POST | `/api/auth/send-email-code` | Send email verification code | No |
 | POST | `/api/auth/login/mobile` | Login via mobile + code | No |
 | POST | `/api/auth/login/email` | Login via email + code | No |
 | GET | `/api/user/info` | Get current user info | Yes |
@@ -269,6 +271,35 @@ migration.Down(sqlDB)  // roll back the last migration
 ```
 
 `goose` tracks applied versions in a `goose_db_version` table, ensuring migrations are never run twice and supporting full rollback.
+
+## 📱 Verification Codes & Notifications
+
+Verification codes are stored in Redis with a 5-min TTL and a 60-second resend cooldown. Sending is handled asynchronously via the task queue.
+
+### Flow
+
+```
+POST /api/auth/send-sms-code  →  generate 6-digit code  →  Redis SETEX  →  taskq.EnqueueUnique  →  Alibaba Cloud SMS
+POST /api/auth/login/mobile   →  Redis GET compare     →  DEL on match →  JWT token
+```
+
+### Alibaba Cloud integration
+
+`pkg/notify/` provides pluggable `SmsSender` and `EmailSender` interfaces. The Alibaba Cloud implementations (`AlibabaSmsSender`, `AlibabaEmailSender`) are wired in `app.go`. To swap providers, implement the interface and change the wiring.
+
+For local development, `LogSender` prints to console — no Alibaba Cloud credentials needed.
+
+### Email templates
+
+Templates are HTML files embedded in the binary via `embed.FS`. The welcome email is at `pkg/notify/template/templates/welcome_email.html`. Add new templates as `.html` files in that directory — they are picked up automatically.
+
+To render a template programmatically:
+
+```go
+import notifytmpl "go-server-starter/pkg/notify/template"
+
+html, _ := notifytmpl.GetEngine().Render("welcome_email.html", data)
+```
 
 ## 📨 Task Queue (Async Jobs)
 

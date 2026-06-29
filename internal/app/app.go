@@ -16,6 +16,7 @@ import (
 	"go-server-starter/pkg/database"
 	"go-server-starter/pkg/jwt"
 	"go-server-starter/pkg/logger"
+	"go-server-starter/pkg/notify"
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/snowflake"
 	"go-server-starter/pkg/taskq"
@@ -122,6 +123,20 @@ func (a *App) Start() error {
 	}
 	a.redis = redis
 
+	// 初始化通知发送器（阿里云 SMS / DirectMail）
+	aliSms, _ := notify.NewAlibabaSmsSender(
+		a.config.AlibabaCloud.AccessKeyID,
+		a.config.AlibabaCloud.AccessKeySecret,
+		a.logger.Named("ALISMS"),
+	)
+	aliEmail, _ := notify.NewAlibabaEmailSender(
+		a.config.AlibabaCloud.AccessKeyID,
+		a.config.AlibabaCloud.AccessKeySecret,
+		a.config.AlibabaCloud.Email.FromAddress,
+		a.config.AlibabaCloud.Email.FromName,
+		a.logger.Named("ALIMAIL"),
+	)
+
 	// 初始化任务队列
 	taskqClient, err := taskq.NewClient(a.config.AsynQ, a.logger.Named("TASKQ-CLIENT"))
 	if err != nil {
@@ -137,8 +152,20 @@ func (a *App) Start() error {
 		},
 	}, a.logger, nil) // nil alerter = default no-op
 
-	// 注册任务处理器（示例：欢迎邮件）
+	// 注入任务处理器依赖
+	if aliSms != nil {
+		taskq.HandlerDeps.SmsSender = aliSms
+	}
+	if aliEmail != nil {
+		taskq.HandlerDeps.EmailSender = aliEmail
+	}
+	taskq.HandlerDeps.SMSSignName = a.config.AlibabaCloud.SMS.SignName
+	taskq.HandlerDeps.SMSTemplateCode = a.config.AlibabaCloud.SMS.TemplateCode
+
+	// 注册任务处理器
 	taskqServer.HandleFunc(taskq.TaskEmailWelcome, taskq.HandleEmailWelcome)
+	taskqServer.HandleFunc(taskq.TaskSendSMSCode, taskq.HandleSendSMSCode)
+	taskqServer.HandleFunc(taskq.TaskSendEmailCode, taskq.HandleSendEmailCode)
 
 	// 启动后台 worker
 	go func() {

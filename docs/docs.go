@@ -181,7 +181,7 @@ const docTemplate = `{
         },
         "/auth/login/email": {
             "post": {
-                "description": "邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实邮件服务。",
+                "description": "邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。",
                 "consumes": [
                     "application/json"
                 ],
@@ -228,7 +228,7 @@ const docTemplate = `{
         },
         "/auth/login/mobile": {
             "post": {
-                "description": "手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实 SMS 服务。",
+                "description": "手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。",
                 "consumes": [
                     "application/json"
                 ],
@@ -265,6 +265,76 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/send-email-code": {
+            "post": {
+                "description": "向指定邮箱发送登录验证码。60 秒内不可重复请求。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "发送邮箱验证码",
+                "parameters": [
+                    {
+                        "description": "邮箱",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.SendEmailCodeReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/send-sms-code": {
+            "post": {
+                "description": "向指定手机号发送登录验证码。60 秒内不可重复请求。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "发送短信验证码",
+                "parameters": [
+                    {
+                        "description": "手机号",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.SendSmsCodeReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
@@ -835,6 +905,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "taskId": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.SendEmailCodeReqDto": {
+            "type": "object",
+            "required": [
+                "email"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.SendSmsCodeReqDto": {
+            "type": "object",
+            "required": [
+                "countryCode",
+                "mobile"
+            ],
+            "properties": {
+                "countryCode": {
+                    "type": "string"
+                },
+                "mobile": {
                     "type": "string"
                 }
             }

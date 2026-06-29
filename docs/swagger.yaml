@@ -91,6 +91,23 @@ definitions:
     - queue
     - taskId
     type: object
+  go-server-starter_internal_dto.SendEmailCodeReqDto:
+    properties:
+      email:
+        type: string
+    required:
+    - email
+    type: object
+  go-server-starter_internal_dto.SendSmsCodeReqDto:
+    properties:
+      countryCode:
+        type: string
+      mobile:
+        type: string
+    required:
+    - countryCode
+    - mobile
+    type: object
   go-server-starter_internal_dto.UserInfoResDto:
     properties:
       avatarURL:
@@ -299,7 +316,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实邮件服务。
+      description: 邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。
       parameters:
       - description: 登录参数
         in: body
@@ -330,7 +347,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实 SMS 服务。
+      description: 手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。
       parameters:
       - description: 登录参数
         in: body
@@ -355,6 +372,52 @@ paths:
             additionalProperties: true
             type: object
       summary: 手机验证码登录
+      tags:
+      - auth
+  /auth/send-email-code:
+    post:
+      consumes:
+      - application/json
+      description: 向指定邮箱发送登录验证码。60 秒内不可重复请求。
+      parameters:
+      - description: 邮箱
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.SendEmailCodeReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 发送邮箱验证码
+      tags:
+      - auth
+  /auth/send-sms-code:
+    post:
+      consumes:
+      - application/json
+      description: 向指定手机号发送登录验证码。60 秒内不可重复请求。
+      parameters:
+      - description: 手机号
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.SendSmsCodeReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 发送短信验证码
       tags:
       - auth
   /hello:

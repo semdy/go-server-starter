@@ -12,6 +12,8 @@ import (
 type AuthHandler interface {
 	LoginByMobileAndCode(c *gin.Context)
 	LoginByEmailAndCode(c *gin.Context)
+	SendSmsCode(c *gin.Context)
+	SendEmailCode(c *gin.Context)
 }
 
 type AuthHandlerImpl struct {
@@ -25,7 +27,7 @@ func NewAuthHandler(logger *zap.Logger, service service.Service) AuthHandler {
 
 // LoginByMobileAndCode godoc
 // @Summary      手机验证码登录
-// @Description  手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实 SMS 服务。
+// @Description  手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -52,7 +54,7 @@ func (h *AuthHandlerImpl) LoginByMobileAndCode(c *gin.Context) {
 
 // LoginByEmailAndCode godoc
 // @Summary      邮箱验证码登录
-// @Description  邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实邮件服务。
+// @Description  邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。
 // @Tags         auth
 // @Accept       json
 // @Produce      json
@@ -75,4 +77,50 @@ func (h *AuthHandlerImpl) LoginByEmailAndCode(c *gin.Context) {
 		return
 	}
 	appCtx.ToSuccess(res)
+}
+
+// SendSmsCode godoc
+// @Summary      发送短信验证码
+// @Description  向指定手机号发送登录验证码。60 秒内不可重复请求。
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.SendSmsCodeReqDto  true  "手机号"
+// @Success      200   {object}  map[string]interface{}
+// @Router       /auth/send-sms-code [post]
+func (h *AuthHandlerImpl) SendSmsCode(c *gin.Context) {
+	var appCtx = ctx.FromGinCtx(c)
+	var params dto.SendSmsCodeReqDto
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	if err := h.service.VerifyCode().SendSmsCode(appCtx.Ctx, params); err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	appCtx.ToSuccess(nil)
+}
+
+// SendEmailCode godoc
+// @Summary      发送邮箱验证码
+// @Description  向指定邮箱发送登录验证码。60 秒内不可重复请求。
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        body  body      dto.SendEmailCodeReqDto  true  "邮箱"
+// @Success      200   {object}  map[string]interface{}
+// @Router       /auth/send-email-code [post]
+func (h *AuthHandlerImpl) SendEmailCode(c *gin.Context) {
+	var appCtx = ctx.FromGinCtx(c)
+	var params dto.SendEmailCodeReqDto
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	if err := h.service.VerifyCode().SendEmailCode(appCtx.Ctx, params); err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	appCtx.ToSuccess(nil)
 }

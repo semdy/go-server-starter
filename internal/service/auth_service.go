@@ -95,6 +95,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 			task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
 				UserUniCode: user.UniCode,
 				Email:       user.Email,
+				Nickname:    user.Nickname,
 			})
 			if task != nil {
 				uniqueKey := taskq.WelcomeEmailUniqueKey(user.UniCode)

@@ -19,8 +19,9 @@ type Config struct {
 	JWT        JWTConfig        `koanf:"jwt"`
 	Database   DatabaseConfig   `koanf:"database"`
 	Redis      RedisConfig      `koanf:"redis"`
-	AsynQ      AsynQConfig      `koanf:"asynQ"`
-	Logger     LoggerConfig     `koanf:"logger"`
+	AsynQ        AsynQConfig         `koanf:"asynQ"`
+	AlibabaCloud AlibabaCloudConfig  `koanf:"alibabaCloud"`
+	Logger       LoggerConfig        `koanf:"logger"`
 	GormLogger GormLoggerConfig `koanf:"gormLogger"`
 	Mode       enum.ServerMode  `koanf:"-"`
 }
@@ -50,9 +51,32 @@ func NewConfigLoader(mode *enum.ServerMode) (*ConfigLoader, error) {
 	}
 
 	// Step 3: Load environment variables (highest priority)
+	// Automatic env works for all-lowercase keys (e.g. APP_DATABASE_PASSWORD → database.password).
+	// For camelCase keys, explicit binding is required below.
 	if err := k.Load(koanfenv.Provider("APP_", ".", envToConfigKey), nil); err != nil {
 		fmt.Printf("warning: failed to load env vars: %v\n", err)
 	}
+	// Explicit bindings for camelCase config keys that automatic env can't match
+	bindEnv(k,
+		// jwt
+		"jwt.tokenSecret",
+		// server
+		"server.readTimeout", "server.writeTimeout", "server.maxHeaderKB",
+		"server.snowflakeNode", "server.apiPrefix",
+		// logger
+		"logger.fileDir", "logger.maxSize", "logger.maxAge",
+		"logger.maxBackups", "logger.consoleOutput",
+		// database
+		"database.maxIdleConns", "database.maxOpenConns",
+		"database.connMaxLifetime", "database.parseTime",
+		// gormLogger
+		"gormLogger.slowThreshold", "gormLogger.skipCallerLookup",
+		"gormLogger.ignoreRecordNotFoundError",
+		// alibabaCloud
+		"alibabaCloud.accessKeyId", "alibabaCloud.accessKeySecret",
+		"alibabaCloud.sms.signName", "alibabaCloud.sms.templateCode",
+		"alibabaCloud.email.fromAddress", "alibabaCloud.email.fromName",
+	)
 
 	// Step 4: Unmarshal into config struct
 	if err := k.UnmarshalWithConf("", config, koanf.UnmarshalConf{Tag: "koanf", FlatPaths: false}); err != nil {
@@ -106,6 +130,17 @@ func (cl *ConfigLoader) findConfigFile(filename string) (string, error) {
 // E.g. "DATABASE_PASSWORD" → "database.password"
 func envToConfigKey(envVar string) string {
 	return strings.ReplaceAll(strings.ToLower(envVar), "_", ".")
+}
+
+// bindEnv explicitly binds camelCase config keys to their APP_ prefixed env vars.
+// Example: "alibabaCloud.accessKeyId" → env var APP_ALIBABACLOUD_ACCESSKEYID
+func bindEnv(k *koanf.Koanf, keys ...string) {
+	for _, key := range keys {
+		envVar := "APP_" + strings.ReplaceAll(strings.ToUpper(key), ".", "_")
+		if val, ok := os.LookupEnv(envVar); ok && val != "" {
+			k.Set(key, val)
+		}
+	}
 }
 
 // ParseMode reads the server mode from APP_MODE env var or -mode flag.

@@ -58,3 +58,13 @@ gormLogger:
   slowThreshold: 100ms
   skipCallerLookup: false
   ignoreRecordNotFoundError: true
+
+# alibabaCloud:
+#   accessKeyId: "LTAI5t..."
+#   accessKeySecret: "..."
+#   sms:
+#     signName: "你的应用"
+#     templateCode: "SMS_123456789"
+#   email:
+#     fromAddress: "noreply@example.com"
+#     fromName: "Go Server Starter"
