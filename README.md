@@ -25,39 +25,52 @@ A production-ready Go web server boilerplate/starter kit with clean architecture
 ```
 go-server-starter/
 ├── cmd/
-│   └── server/          # Application entry point
-├── configs/             # Configuration files
-│   ├── config.yml       # Default config
-│   ├── config.dev.yml   # Development config
-│   └── config.test.yml  # Test config
+│   └── server/              # Application entry point
+├── configs/                 # Configuration files
+│   ├── config.yml           # Default config (no secrets)
+│   ├── config.dev.yml       # Local dev overrides (gitignored)
+│   ├── config.dev.yml.example  # Dev config template
+│   └── config.test.yml      # Test config (gitignored)
+├── docs/                    # Swagger generated docs (committed)
 ├── internal/
-│   ├── app/             # Application initialization
-│   ├── config/          # Config struct definitions
-│   ├── constant/        # Constants
-│   ├── ctx/             # Custom context
-│   ├── dto/             # Data Transfer Objects
-│   ├── enum/            # Enumerations
-│   ├── exception/       # Exception handling
-│   ├── handler/         # HTTP handlers (controllers)
-│   ├── i18n/            # Internationalization
-│   ├── middleware/      # HTTP middlewares
-│   ├── model/           # Database models
-│   ├── repo/            # Repository layer (data access)
-│   ├── router/          # Route definitions
-│   ├── seed/            # Database seeders
-│   └── service/         # Business logic layer
+│   ├── app/                 # Application initialization & DI
+│   ├── config/              # Config structs & loading (koanf v2)
+│   ├── constant/            # Constants (Redis keys, context keys)
+│   ├── ctx/                 # Custom request context (Gin wrapper)
+│   ├── database/
+│   │   └── migration/       # Goose migrations (embedded SQL)
+│   ├── dto/                 # Data Transfer Objects
+│   ├── enum/                # Enumerations
+│   ├── exception/           # Domain exceptions with i18n
+│   ├── handler/             # HTTP handlers (controllers)
+│   ├── i18n/                # Internationalization
+│   ├── middleware/           # HTTP middlewares
+│   ├── model/               # Database models (GORM)
+│   ├── repo/                # Repository layer (data access)
+│   ├── router/              # Route definitions
+│   ├── seed/                # Database seeders
+│   └── service/             # Business logic layer
 ├── pkg/
-│   ├── asyn_queue/      # Asynq client/server
-│   ├── auth/            # Authorization utilities
-│   ├── database/        # Database connection
-│   ├── jwt/             # JWT utilities
-│   ├── logger/          # Logger configuration
-│   ├── redis/           # Redis client
-│   ├── snowflake/       # Snowflake ID generator
-│   ├── translator/      # Translator utilities
-│   ├── utils/           # Common utilities
-│   └── validator/       # Validation rules
-└── logs/                # Log files
+│   ├── asyn_queue/          # Asynq client/server
+│   ├── auth/                # RBAC middleware
+│   ├── database/            # MySQL connection & auto-create DB
+│   ├── jwt/                 # JWT token management
+│   ├── logger/              # Zap logger + Lumberjack rotation
+│   ├── redis/               # Redis client
+│   ├── snowflake/           # Snowflake ID generator
+│   ├── translator/          # Validator translator (zh/en)
+│   ├── utils/               # Common utilities
+│   └── validator/           # Custom validation rules
+├── .air.toml                # Air hot reload config
+├── .env.example             # Environment variables template
+├── CLAUDE.md                # Claude Code guidance
+├── Dockerfile               # Multi-stage build
+├── docker-compose.yml       # Production Docker Compose
+├── docker-compose.dev.yml   # Dev Docker Compose (MySQL + Redis only)
+├── generate.sh              # Entity scaffold generator
+├── go.mod
+├── go.sum
+└── logs/                    # Log files
 ```
 
 ## 🚀 Getting Started

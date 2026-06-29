@@ -25,39 +25,52 @@
 ```
 go-server-starter/
 ├── cmd/
-│   └── server/          # 应用程序入口
-├── configs/             # 配置文件
-│   ├── config.yml       # 默认配置
-│   ├── config.dev.yml   # 开发环境配置
-│   └── config.test.yml  # 测试环境配置
+│   └── server/              # 应用程序入口
+├── configs/                 # 配置文件
+│   ├── config.yml           # 默认配置（不含密钥）
+│   ├── config.dev.yml       # 本地开发覆盖（gitignored）
+│   ├── config.dev.yml.example  # 开发配置模板
+│   └── config.test.yml      # 测试配置（gitignored）
+├── docs/                    # Swagger 文档生成目录（已提交）
 ├── internal/
-│   ├── app/             # 应用初始化
-│   ├── config/          # 配置结构体定义
-│   ├── constant/        # 常量
-│   ├── ctx/             # 自定义上下文
-│   ├── dto/             # 数据传输对象
-│   ├── enum/            # 枚举类型
-│   ├── exception/       # 异常处理
-│   ├── handler/         # HTTP 处理器（控制器）
-│   ├── i18n/            # 国际化
-│   ├── middleware/      # HTTP 中间件
-│   ├── model/           # 数据库模型
-│   ├── repo/            # 仓储层（数据访问）
-│   ├── router/          # 路由定义
-│   ├── seed/            # 数据库种子数据
-│   └── service/         # 业务逻辑层
+│   ├── app/                 # 应用初始化 & 依赖注入
+│   ├── config/              # 配置结构体定义（koanf v2）
+│   ├── constant/            # 常量（Redis key、context key）
+│   ├── ctx/                 # 自定义请求上下文（Gin 封装）
+│   ├── database/
+│   │   └── migration/       # Goose 迁移文件（embed SQL）
+│   ├── dto/                 # 数据传输对象
+│   ├── enum/                # 枚举类型
+│   ├── exception/           # 领域异常（含 i18n）
+│   ├── handler/             # HTTP 处理器（控制器）
+│   ├── i18n/                # 国际化
+│   ├── middleware/           # HTTP 中间件
+│   ├── model/               # 数据库模型（GORM）
+│   ├── repo/                # 仓储层（数据访问）
+│   ├── router/              # 路由定义
+│   ├── seed/                # 数据库种子数据
+│   └── service/             # 业务逻辑层
 ├── pkg/
-│   ├── asyn_queue/      # Asynq 客户端/服务端
-│   ├── auth/            # 授权工具
-│   ├── database/        # 数据库连接
-│   ├── jwt/             # JWT 工具
-│   ├── logger/          # 日志配置
-│   ├── redis/           # Redis 客户端
-│   ├── snowflake/       # 雪花 ID 生成器
-│   ├── translator/      # 翻译工具
-│   ├── utils/           # 通用工具
-│   └── validator/       # 验证规则
-└── logs/                # 日志文件
+│   ├── asyn_queue/          # Asynq 客户端/服务端
+│   ├── auth/                # RBAC 中间件
+│   ├── database/            # MySQL 连接 & 自动建库
+│   ├── jwt/                 # JWT 令牌管理
+│   ├── logger/              # Zap 日志 + Lumberjack 轮转
+│   ├── redis/               # Redis 客户端
+│   ├── snowflake/           # 雪花 ID 生成器
+│   ├── translator/          # 验证器翻译（zh/en）
+│   ├── utils/               # 通用工具
+│   └── validator/           # 自定义验证规则
+├── .air.toml                # Air 热重载配置
+├── .env.example             # 环境变量模板
+├── CLAUDE.md                # Claude Code 指引
+├── Dockerfile               # 多阶段构建
+├── docker-compose.yml       # 生产环境 Docker Compose
+├── docker-compose.dev.yml   # 开发环境（仅 MySQL + Redis）
+├── generate.sh              # 模块脚手架生成器
+├── go.mod
+├── go.sum
+└── logs/                    # 日志文件
 ```
 
 ## 🚀 快速开始
