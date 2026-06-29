@@ -29,6 +29,9 @@ func (r *Router) SetupRoutes() {
 	// Hello (公开接口)
 	r.router.GET("/hello", r.handler.Hello().Hello)
 
+	// Healthz (存活+就绪检查)
+	r.router.GET("/healthz", r.handler.Health().Healthz)
+
 	// Auth - 认证相关
 	r.SetupAuthRoutes()
 

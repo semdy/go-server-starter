@@ -3,7 +3,7 @@
 # config.dev.yml is gitignored and will never be committed.
 
 server:
-  port: 8090
+  port: 8080
 
 jwt:
   tokenSecret: dev-secret-do-not-use-in-production

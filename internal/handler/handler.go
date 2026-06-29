@@ -2,6 +2,8 @@ package handler
 
 import (
 	"go-server-starter/internal/service"
+	"go-server-starter/pkg/database"
+	"go-server-starter/pkg/redis"
 
 	"go.uber.org/zap"
 )
@@ -12,6 +14,7 @@ type Handler interface {
 	UserRole() UserRoleHandler
 	Auth() AuthHandler
 	DeadLetter() DeadLetterHandler
+	Health() HealthHandler
 }
 
 type HandlerImpl struct {
@@ -21,9 +24,10 @@ type HandlerImpl struct {
 	userRoleHandler   UserRoleHandler
 	authHandler       AuthHandler
 	deadLetterHandler DeadLetterHandler
+	healthHandler     HealthHandler
 }
 
-func NewHandler(service service.Service, logger *zap.Logger) Handler {
+func NewHandler(service service.Service, db *database.DB, redis *redis.Client, logger *zap.Logger) Handler {
 	return &HandlerImpl{
 		logger:            logger,
 		helloHandler:      NewHelloHandler(logger),
@@ -31,6 +35,7 @@ func NewHandler(service service.Service, logger *zap.Logger) Handler {
 		userRoleHandler:   NewUserRoleHandler(logger, service),
 		authHandler:       NewAuthHandler(logger, service),
 		deadLetterHandler: NewDeadLetterHandler(logger, service),
+		healthHandler:     NewHealthHandler(logger, db, redis),
 	}
 }
 
@@ -39,3 +44,4 @@ func (h *HandlerImpl) User() UserHandler             { return h.userHandler }
 func (h *HandlerImpl) UserRole() UserRoleHandler     { return h.userRoleHandler }
 func (h *HandlerImpl) Auth() AuthHandler             { return h.authHandler }
 func (h *HandlerImpl) DeadLetter() DeadLetterHandler { return h.deadLetterHandler }
+func (h *HandlerImpl) Health() HealthHandler         { return h.healthHandler }
