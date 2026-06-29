@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"go-server-starter/internal/constant"
-	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
@@ -22,13 +21,13 @@ import (
 )
 
 type UserRoleService interface {
-	GetRolesCodeByUniCode(ctx *ctx.Context, uniCode string) ([]enum.RoleCode, *exception.Exception)
-	GetCachedRolesCodeByUniCode(ctx *ctx.Context, uniCode string) ([]enum.RoleCode, *exception.Exception)
-	GetByID(ctx *ctx.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception)
-	GetTable(ctx *ctx.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception)
-	Create(ctx *ctx.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception)
-	Update(ctx *ctx.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
-	Delete(ctx *ctx.Context, id uint64) *exception.Exception
+	GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception)
+	GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception)
+	GetByID(ctx context.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception)
+	GetTable(ctx context.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception)
+	Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception)
+	Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
+	Delete(ctx context.Context, id uint64) *exception.Exception
 }
 
 type UserRoleServiceImpl struct {
@@ -46,8 +45,8 @@ func NewUserRoleService(repo repo.Repo, redis *redis.Client, logger *zap.Logger)
 	}
 }
 
-func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx *ctx.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
-	roles, err := s.repo.User().GetRolesByUniCode(ctx.Ctx, uniCode)
+func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
+	roles, err := s.repo.User().GetRolesByUniCode(ctx, uniCode)
 	if err != nil {
 		s.logger.Error("get roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
 		return nil, exception.InternalServerError.Append(err.Error())
@@ -59,10 +58,10 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx *ctx.Context, uniCode st
 	return rolesCode, nil
 }
 
-func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx *ctx.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
+func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
 	cacheKey := constant.RedisKeyOfAuthRoles(uniCode)
 
-	dataStr, err := s.redis.Get(ctx.Ctx, cacheKey).Result()
+	dataStr, err := s.redis.Get(ctx, cacheKey).Result()
 	if err == nil {
 		// Cache hit — deserialize and return
 		var roles []enum.RoleCode
@@ -91,7 +90,7 @@ func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx *ctx.Context, uniC
 
 		// Populate cache (best-effort, don't fail on cache write error)
 		if rolesJSON, err := json.Marshal(roles); err == nil {
-			if setErr := s.redis.Set(ctx.Ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
+			if setErr := s.redis.Set(ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
 				s.logger.Warn("failed to set role cache", zap.String("uniCode", uniCode), zap.Error(setErr))
 			}
 		}
@@ -151,8 +150,8 @@ func toUserRoleResDto(role *model.UserRole) *dto.UserRoleResDto {
 	}
 }
 
-func (s *UserRoleServiceImpl) GetByID(ctx *ctx.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception) {
-	role, err := s.repo.UserRole().GetByID(ctx.Ctx, id)
+func (s *UserRoleServiceImpl) GetByID(ctx context.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception) {
+	role, err := s.repo.UserRole().GetByID(ctx, id)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -162,13 +161,13 @@ func (s *UserRoleServiceImpl) GetByID(ctx *ctx.Context, id uint64) (*dto.UserRol
 	return toUserRoleResDto(role), nil
 }
 
-func (s *UserRoleServiceImpl) GetTable(ctx *ctx.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception) {
+func (s *UserRoleServiceImpl) GetTable(ctx context.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception) {
 	opts := []repo.QueryOption{
 		repo.Order("id ASC"),
 		repo.WherePtrNonEmpty("code = ?", params.Code),
 		repo.WherePtrNonEmpty("enabled = ?", params.Enabled),
 	}
-	roles, total, err := s.repo.UserRole().GetTable(ctx.Ctx, params.Page, params.PageSize, opts...)
+	roles, total, err := s.repo.UserRole().GetTable(ctx, params.Page, params.PageSize, opts...)
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -179,14 +178,14 @@ func (s *UserRoleServiceImpl) GetTable(ctx *ctx.Context, params dto.UserRoleTabl
 	return utils.AssemblePaginationResDto(res, total, params.Page, params.PageSize), nil
 }
 
-func (s *UserRoleServiceImpl) Create(ctx *ctx.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
+func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
 	code, err := enum.ParseRoleCode(params.Code)
 	if err != nil {
 		return nil, exception.InvalidParam.Append("invalid role code: " + params.Code)
 	}
 
 	// Check if role already exists
-	existing, err := s.repo.UserRole().GetOne(ctx.Ctx, repo.Where("code = ?", code))
+	existing, err := s.repo.UserRole().GetOne(ctx, repo.Where("code = ?", code))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -200,18 +199,18 @@ func (s *UserRoleServiceImpl) Create(ctx *ctx.Context, params dto.UserRoleCreate
 	}
 
 	role := &model.UserRole{Code: code, Enabled: enabled}
-	if err := s.repo.UserRole().Create(ctx.Ctx, role); err != nil {
+	if err := s.repo.UserRole().Create(ctx, role); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 
 	// Invalidate role caches so any cached role lists reflect the new role
-	s.invalidateAllRoleCaches(ctx.Ctx)
+	s.invalidateAllRoleCaches(ctx)
 
 	return toUserRoleResDto(role), nil
 }
 
-func (s *UserRoleServiceImpl) Update(ctx *ctx.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
-	role, err := s.repo.UserRole().GetByID(ctx.Ctx, id)
+func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
+	role, err := s.repo.UserRole().GetByID(ctx, id)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -230,23 +229,23 @@ func (s *UserRoleServiceImpl) Update(ctx *ctx.Context, id uint64, params dto.Use
 		role.Enabled = *params.Enabled
 	}
 
-	if err := s.repo.UserRole().UpdateByZeroFields(ctx.Ctx, id, role); err != nil {
+	if err := s.repo.UserRole().UpdateByZeroFields(ctx, id, role); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 
 	// Invalidate caches — role code or enabled status may have changed
-	s.invalidateAllRoleCaches(ctx.Ctx)
+	s.invalidateAllRoleCaches(ctx)
 
 	return toUserRoleResDto(role), nil
 }
 
-func (s *UserRoleServiceImpl) Delete(ctx *ctx.Context, id uint64) *exception.Exception {
-	if err := s.repo.UserRole().SoftDelete(ctx.Ctx, id); err != nil {
+func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.Exception {
+	if err := s.repo.UserRole().SoftDelete(ctx, id); err != nil {
 		return nil
 	}
 
 	// Invalidate caches — deleted role should no longer appear in user role lists
-	s.invalidateAllRoleCaches(ctx.Ctx)
+	s.invalidateAllRoleCaches(ctx)
 
 	return nil
 }

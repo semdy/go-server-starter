@@ -3,17 +3,14 @@ package service
 import (
 	"context"
 	"go-server-starter/internal/config"
-	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
+	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/jwt"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -56,22 +53,12 @@ func testJWT() *jwt.JWT {
 	}, zap.NewNop())
 }
 
-// newTestGinCtx creates a gin.Context for testing with a device-type header.
-func newTestGinCtx(deviceType string) (*ctx.Context, *gin.Context) {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodPost, "/api/auth/login", nil)
-	c.Request.Header.Set("Device-Type", deviceType)
-	return ctx.FromGinCtx(c), c
-}
-
 func TestVerifyCode(t *testing.T) {
 	tests := []struct {
-		name      string
-		code      string
+		name       string
+		code       string
 		invalidErr *exception.Exception
-		wantErr   bool
+		wantErr    bool
 	}{
 		{"valid code", "123456", exception.UserMobileVerificationCodeIsIncorrect, false},
 		{"empty code", "", exception.UserMobileVerificationCodeIsIncorrect, true},
@@ -95,9 +82,8 @@ func TestLoginByMobileAndCode_InvalidCode(t *testing.T) {
 		testJWT(),
 		zap.NewNop(),
 	)
-	c, _ := newTestGinCtx("web")
 
-	_, exc := svc.LoginByMobileAndCode(c, dto.AuthLoginByMobileAndCodeReqDto{
+	_, exc := svc.LoginByMobileAndCode(context.Background(), enum.DeviceTypeWeb, dto.AuthLoginByMobileAndCodeReqDto{
 		Mobile:      "13800138000",
 		CountryCode: "86",
 		Code:        "",
@@ -117,9 +103,8 @@ func TestLoginByEmailAndCode_InvalidCode(t *testing.T) {
 		testJWT(),
 		zap.NewNop(),
 	)
-	c, _ := newTestGinCtx("web")
 
-	_, exc := svc.LoginByEmailAndCode(c, dto.AuthLoginByEmailAndCodeReqDto{
+	_, exc := svc.LoginByEmailAndCode(context.Background(), enum.DeviceTypeWeb, dto.AuthLoginByEmailAndCodeReqDto{
 		Email: "test@example.com",
 		Code:  "",
 	})

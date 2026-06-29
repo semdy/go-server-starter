@@ -1,8 +1,8 @@
 package service
 
 import (
+	"context"
 	"errors"
-	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
@@ -16,8 +16,8 @@ import (
 )
 
 type AuthService interface {
-	LoginByMobileAndCode(ctx *ctx.Context, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
-	LoginByEmailAndCode(ctx *ctx.Context, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
+	LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
+	LoginByEmailAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 }
 
 type AuthServiceImpl struct {
@@ -36,15 +36,13 @@ func NewAuthService(repo repo.Repo, jwt *jwt.JWT, logger *zap.Logger) AuthServic
 
 // loginOrRegister is a shared helper that looks up a user by a query condition,
 // and if not found, creates a new user with the given fields and binds the "user" role.
-// The verifyCode parameter is a callback for custom verification logic (SMS, email, etc.).
 func (s *AuthServiceImpl) loginOrRegister(
-	ctx *ctx.Context,
+	ctx context.Context,
+	deviceType enum.DeviceType,
 	lookupOpt repo.QueryOption,
 	newUser func(uniCode string) *model.User,
 ) (*dto.AuthTokenResDto, *exception.Exception) {
-	deviceType := ctx.GetDeviceType()
-
-	user, err := s.repo.User().GetOne(ctx.Ctx, lookupOpt)
+	user, err := s.repo.User().GetOne(ctx, lookupOpt)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -60,14 +58,14 @@ func (s *AuthServiceImpl) loginOrRegister(
 			}
 		}()
 
-		uniCode, err := userRepo.GenerateUniCode(ctx.Ctx)
+		uniCode, err := userRepo.GenerateUniCode(ctx)
 		if err != nil {
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
 
 		// Bind default "user" role
-		role, err := userRoleRepo.GetOne(ctx.Ctx, repo.Where("code = ?", enum.RoleCodeUser))
+		role, err := userRoleRepo.GetOne(ctx, repo.Where("code = ?", enum.RoleCodeUser))
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
@@ -80,7 +78,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		user = newUser(uniCode)
 		user.Roles = []model.UserRole{*role}
 
-		if err := userRepo.Create(ctx.Ctx, user); err != nil {
+		if err := userRepo.Create(ctx, user); err != nil {
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
@@ -97,7 +95,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 	return &dto.AuthTokenResDto{Token: token}, nil
 }
 
-func (s *AuthServiceImpl) LoginByMobileAndCode(ctx *ctx.Context, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
+func (s *AuthServiceImpl) LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
 	// TODO: Implement real SMS verification code validation
 	if err := verifyCode(params.Code, exception.UserMobileVerificationCodeIsIncorrect); err != nil {
 		return nil, err
@@ -105,7 +103,7 @@ func (s *AuthServiceImpl) LoginByMobileAndCode(ctx *ctx.Context, params dto.Auth
 
 	params.Mobile = strings.ReplaceAll(params.Mobile, " ", "")
 
-	return s.loginOrRegister(ctx,
+	return s.loginOrRegister(ctx, deviceType,
 		repo.Where("mobile = ? AND country_code = ?", params.Mobile, params.CountryCode),
 		func(uniCode string) *model.User {
 			return &model.User{
@@ -118,7 +116,7 @@ func (s *AuthServiceImpl) LoginByMobileAndCode(ctx *ctx.Context, params dto.Auth
 	)
 }
 
-func (s *AuthServiceImpl) LoginByEmailAndCode(ctx *ctx.Context, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
+func (s *AuthServiceImpl) LoginByEmailAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
 	// TODO: Implement real email verification code validation
 	if err := verifyCode(params.Code, exception.UserEmailVerificationCodeIsIncorrect); err != nil {
 		return nil, err
@@ -126,7 +124,7 @@ func (s *AuthServiceImpl) LoginByEmailAndCode(ctx *ctx.Context, params dto.AuthL
 
 	params.Email = strings.ToLower(strings.TrimSpace(params.Email))
 
-	return s.loginOrRegister(ctx,
+	return s.loginOrRegister(ctx, deviceType,
 		repo.Where("email = ?", params.Email),
 		func(uniCode string) *model.User {
 			return &model.User{

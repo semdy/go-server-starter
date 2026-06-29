@@ -40,7 +40,7 @@ func (a *AuthImpl) RoleCheck(roleCheckType RoleCheckType, requiredRoles ...enum.
 			ctx.ToError(exc)
 			return
 		}
-		userRoles, exc := a.service.UserRole().GetCachedRolesCodeByUniCode(ctx, uniCode)
+		userRoles, exc := a.service.UserRole().GetCachedRolesCodeByUniCode(ctx.Ctx, uniCode)
 		if exc != nil {
 			ctx.ToError(exc)
 			return

@@ -7,7 +7,6 @@ import (
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/i18n"
-	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/utils"
 	"io"
 	"net/http"
@@ -76,18 +75,6 @@ func (c *Context) GetUserUniCode() (string, *exception.Exception) {
 
 func (c *Context) SetUserUniCode(code string) {
 	c.Gtx.Set(constant.CTX_KEY_OF_USER_UNI_CODE, code)
-}
-
-func (c *Context) GetUserID(dbRepo repo.Repo) (uint64, *exception.Exception) {
-	code, exc := c.GetUserUniCode()
-	if exc != nil {
-		return 0, exc
-	}
-	var ID, err = dbRepo.User().GetIDByUniCode(c.Ctx, code)
-	if err != nil {
-		return 0, exception.InternalServerError.Append(err.Error())
-	}
-	return ID, nil
 }
 
 func (c *Context) GetPathParamID(key string) (uint64, *exception.Exception) {

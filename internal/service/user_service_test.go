@@ -2,17 +2,13 @@ package service
 
 import (
 	"context"
-	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -20,9 +16,9 @@ import (
 // testUserRepo is a stub that returns canned data for user service tests.
 type testUserRepo struct {
 	repo.UserRepo
-	userByID      *model.User
-	userByIDErr   error
-	userByUniCode *model.User
+	userByID        *model.User
+	userByIDErr     error
+	userByUniCode    *model.User
 	userByUniCodeErr error
 }
 
@@ -81,20 +77,11 @@ func newTestUserService(userRepo repo.UserRepo) UserService {
 	)
 }
 
-func newTestGinCtxForUser() *ctx.Context {
-	gin.SetMode(gin.TestMode)
-	w := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(w)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/user/info", nil)
-	return ctx.FromGinCtx(c)
-}
-
 func TestGetByID_Found(t *testing.T) {
 	expected := sampleUser()
 	svc := newTestUserService(&testUserRepo{userByID: expected})
-	c := newTestGinCtxForUser()
 
-	user, exc := svc.GetByID(c, 1)
+	user, exc := svc.GetByID(context.Background(), 1)
 	if exc != nil {
 		t.Fatalf("unexpected error: %v", exc)
 	}
@@ -105,9 +92,8 @@ func TestGetByID_Found(t *testing.T) {
 
 func TestGetByID_NotFound(t *testing.T) {
 	svc := newTestUserService(&testUserRepo{userByID: nil, userByIDErr: gorm.ErrRecordNotFound})
-	c := newTestGinCtxForUser()
 
-	_, exc := svc.GetByID(c, 999)
+	_, exc := svc.GetByID(context.Background(), 999)
 	if exc == nil {
 		t.Fatal("expected error for not found, got nil")
 	}
@@ -119,9 +105,8 @@ func TestGetByID_NotFound(t *testing.T) {
 func TestGetByUniCode_Found(t *testing.T) {
 	expected := sampleUser()
 	svc := newTestUserService(&testUserRepo{userByUniCode: expected})
-	c := newTestGinCtxForUser()
 
-	user, exc := svc.GetByUniCode(c, "U-001")
+	user, exc := svc.GetByUniCode(context.Background(), "U-001")
 	if exc != nil {
 		t.Fatalf("unexpected error: %v", exc)
 	}
@@ -132,9 +117,8 @@ func TestGetByUniCode_Found(t *testing.T) {
 
 func TestGetByUniCode_NotFound(t *testing.T) {
 	svc := newTestUserService(&testUserRepo{userByUniCode: nil, userByUniCodeErr: gorm.ErrRecordNotFound})
-	c := newTestGinCtxForUser()
 
-	_, exc := svc.GetByUniCode(c, "nonexistent")
+	_, exc := svc.GetByUniCode(context.Background(), "nonexistent")
 	if exc == nil {
 		t.Fatal("expected error for not found, got nil")
 	}
@@ -146,9 +130,8 @@ func TestGetByUniCode_NotFound(t *testing.T) {
 func TestGetInfoByUniCode_Success(t *testing.T) {
 	expected := sampleUser()
 	svc := newTestUserService(&testUserRepo{userByUniCode: expected})
-	c := newTestGinCtxForUser()
 
-	info, exc := svc.GetInfoByUniCode(c, "U-001")
+	info, exc := svc.GetInfoByUniCode(context.Background(), "U-001")
 	if exc != nil {
 		t.Fatalf("unexpected error: %v", exc)
 	}
@@ -165,30 +148,15 @@ func TestGetInfoByUniCode_Success(t *testing.T) {
 
 func TestGetInfoByUniCode_NotFound(t *testing.T) {
 	svc := newTestUserService(&testUserRepo{userByUniCode: nil, userByUniCodeErr: gorm.ErrRecordNotFound})
-	c := newTestGinCtxForUser()
 
-	_, exc := svc.GetInfoByUniCode(c, "nonexistent")
+	_, exc := svc.GetInfoByUniCode(context.Background(), "nonexistent")
 	if exc == nil {
 		t.Fatal("expected error, got nil")
 	}
 }
 
-func TestUpdateInfo_UserNotFound(t *testing.T) {
-	// UpdateInfo calls GetUserID which needs the uniCode stored in gin context,
-	// so we skip that path and test via GetByUniCode indirectly.
-	svc := newTestUserService(&testUserRepo{userByUniCode: nil, userByUniCodeErr: gorm.ErrRecordNotFound})
-	c := newTestGinCtxForUser()
-
-	_, exc := svc.GetByUniCode(c, "nonexistent")
-	if exc == nil {
-		t.Fatal("expected error, got nil")
-	}
-}
-
-// TestDTOs tests the DTO structures used by the service layer.
 func TestPaginationReqDto_Defaults(t *testing.T) {
 	params := dto.UserTableQueryReqDto{}
-	// Verify zero-value pagination fields are valid (service uses NormalizePageAndPageSize)
 	if params.Page != 0 {
 		t.Error("expected default Page to be 0")
 	}

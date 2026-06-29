@@ -1,8 +1,8 @@
 package service
 
 import (
+	"context"
 	"errors"
-	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
@@ -16,11 +16,11 @@ import (
 )
 
 type UserService interface {
-	GetByID(ctx *ctx.Context, id uint64) (*model.User, *exception.Exception)
-	GetByUniCode(ctx *ctx.Context, uniCode string) (*model.User, *exception.Exception)
-	GetInfoByUniCode(ctx *ctx.Context, uniCode string) (*dto.UserInfoResDto, *exception.Exception)
-	GetTable(ctx *ctx.Context, params dto.UserTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserListItemResDto], *exception.Exception)
-	UpdateInfo(ctx *ctx.Context, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception)
+	GetByID(ctx context.Context, id uint64) (*model.User, *exception.Exception)
+	GetByUniCode(ctx context.Context, uniCode string) (*model.User, *exception.Exception)
+	GetInfoByUniCode(ctx context.Context, uniCode string) (*dto.UserInfoResDto, *exception.Exception)
+	GetTable(ctx context.Context, params dto.UserTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserListItemResDto], *exception.Exception)
+	UpdateInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception)
 }
 
 type UserServiceImpl struct {
@@ -35,8 +35,8 @@ func NewUserService(repo repo.Repo, redis *redis.Client, logger *zap.Logger) Use
 	}
 }
 
-func (s *UserServiceImpl) GetByID(ctx *ctx.Context, id uint64) (*model.User, *exception.Exception) {
-	user, err := s.repo.User().GetByID(ctx.Ctx, id, repo.Preload("Roles"))
+func (s *UserServiceImpl) GetByID(ctx context.Context, id uint64) (*model.User, *exception.Exception) {
+	user, err := s.repo.User().GetByID(ctx, id, repo.Preload("Roles"))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -46,8 +46,8 @@ func (s *UserServiceImpl) GetByID(ctx *ctx.Context, id uint64) (*model.User, *ex
 	return user, nil
 }
 
-func (s *UserServiceImpl) GetByUniCode(ctx *ctx.Context, uniCode string) (*model.User, *exception.Exception) {
-	user, err := s.repo.User().GetByUniCode(ctx.Ctx, uniCode)
+func (s *UserServiceImpl) GetByUniCode(ctx context.Context, uniCode string) (*model.User, *exception.Exception) {
+	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -57,7 +57,7 @@ func (s *UserServiceImpl) GetByUniCode(ctx *ctx.Context, uniCode string) (*model
 	return user, nil
 }
 
-func (s *UserServiceImpl) GetInfoByUniCode(ctx *ctx.Context, uniCode string) (*dto.UserInfoResDto, *exception.Exception) {
+func (s *UserServiceImpl) GetInfoByUniCode(ctx context.Context, uniCode string) (*dto.UserInfoResDto, *exception.Exception) {
 	user, err := s.GetByUniCode(ctx, uniCode)
 	if err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (s *UserServiceImpl) GetInfoByUniCode(ctx *ctx.Context, uniCode string) (*d
 	}, nil
 }
 
-func (s *UserServiceImpl) GetTable(ctx *ctx.Context, params dto.UserTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserListItemResDto], *exception.Exception) {
+func (s *UserServiceImpl) GetTable(ctx context.Context, params dto.UserTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserListItemResDto], *exception.Exception) {
 	opts := []repo.QueryOption{
 		repo.Order("created_at DESC"),
 		repo.Preload("Roles"),
@@ -90,7 +90,7 @@ func (s *UserServiceImpl) GetTable(ctx *ctx.Context, params dto.UserTableQueryRe
 		repo.WhereAutoLikePrefix("mobile", params.Mobile),
 		repo.WhereAutoLikePrefix("country_code", params.CountryCode),
 	}
-	users, total, err := s.repo.User().GetTable(ctx.Ctx, params.Page, params.PageSize, opts...)
+	users, total, err := s.repo.User().GetTable(ctx, params.Page, params.PageSize, opts...)
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -116,18 +116,15 @@ func (s *UserServiceImpl) GetTable(ctx *ctx.Context, params dto.UserTableQueryRe
 	return utils.AssemblePaginationResDto(res, total, params.Page, params.PageSize), nil
 }
 
-func (s *UserServiceImpl) UpdateInfo(ctx *ctx.Context, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
-	userID, exc := ctx.GetUserID(s.repo)
-	if exc != nil {
-		return nil, exc
-	}
-	user, err := s.repo.User().GetByID(ctx.Ctx, userID, repo.Preload("Roles"))
+func (s *UserServiceImpl) UpdateInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
+	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 	if user == nil {
 		return nil, exception.UserNotFound
 	}
+
 	if params.Nickname != nil {
 		user.Nickname = *params.Nickname
 	}
@@ -137,7 +134,7 @@ func (s *UserServiceImpl) UpdateInfo(ctx *ctx.Context, params dto.UserUpdateInfo
 	if params.Desc != nil {
 		user.Desc = *params.Desc
 	}
-	if err := s.repo.User().UpdateByZeroFields(ctx.Ctx, userID, user); err != nil {
+	if err := s.repo.User().UpdateByZeroFields(ctx, user.ID, user); err != nil {
 		return nil, exception.UserUpdateInfoFailed.Append(err.Error())
 	}
 	roles := make([]string, len(user.Roles))

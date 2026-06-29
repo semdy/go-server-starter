@@ -25,46 +25,51 @@ func NewUserHandler(logger *zap.Logger, service service.Service) UserHandler {
 }
 
 func (h *UserHandlerImpl) GetInfo(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
-	uniCode, err := ctx.GetUserUniCode()
+	var appCtx = ctx.FromGinCtx(c)
+	uniCode, err := appCtx.GetUserUniCode()
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	user, err := h.service.User().GetInfoByUniCode(ctx, uniCode)
+	user, err := h.service.User().GetInfoByUniCode(appCtx.Ctx, uniCode)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(user)
+	appCtx.ToSuccess(user)
 }
 
 func (h *UserHandlerImpl) UpdateInfo(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
+	var appCtx = ctx.FromGinCtx(c)
 	var params dto.UserUpdateInfoReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.User().UpdateInfo(ctx, params)
+	uniCode, err := appCtx.GetUserUniCode()
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	res, err := h.service.User().UpdateInfo(appCtx.Ctx, uniCode, params)
+	if err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	appCtx.ToSuccess(res)
 }
 
 func (h *UserHandlerImpl) GetTable(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
+	var appCtx = ctx.FromGinCtx(c)
 	var params dto.UserTableQueryReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.User().GetTable(ctx, params)
+	res, err := h.service.User().GetTable(appCtx.Ctx, params)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }

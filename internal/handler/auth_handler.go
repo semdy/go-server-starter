@@ -24,31 +24,33 @@ func NewAuthHandler(logger *zap.Logger, service service.Service) AuthHandler {
 }
 
 func (h *AuthHandlerImpl) LoginByMobileAndCode(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
+	var appCtx = ctx.FromGinCtx(c)
 	var params dto.AuthLoginByMobileAndCodeReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.Auth().LoginByMobileAndCode(ctx, params)
+	deviceType := appCtx.GetDeviceType()
+	res, err := h.service.Auth().LoginByMobileAndCode(appCtx.Ctx, deviceType, params)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }
 
 func (h *AuthHandlerImpl) LoginByEmailAndCode(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
+	var appCtx = ctx.FromGinCtx(c)
 	var params dto.AuthLoginByEmailAndCodeReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.Auth().LoginByEmailAndCode(ctx, params)
+	deviceType := appCtx.GetDeviceType()
+	res, err := h.service.Auth().LoginByEmailAndCode(appCtx.Ctx, deviceType, params)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }

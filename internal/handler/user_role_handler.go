@@ -27,80 +27,80 @@ func NewUserRoleHandler(logger *zap.Logger, service service.Service) UserRoleHan
 }
 
 func (h *UserRoleHandlerImpl) GetByID(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
-	id, err := ctx.GetPathParamID("id")
+	var appCtx = ctx.FromGinCtx(c)
+	id, err := appCtx.GetPathParamID("id")
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.UserRole().GetByID(ctx, id)
+	res, err := h.service.UserRole().GetByID(appCtx.Ctx, id)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }
 
 func (h *UserRoleHandlerImpl) GetTable(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
+	var appCtx = ctx.FromGinCtx(c)
 	var params dto.UserRoleTableQueryReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.UserRole().GetTable(ctx, params)
+	res, err := h.service.UserRole().GetTable(appCtx.Ctx, params)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }
 
 func (h *UserRoleHandlerImpl) Create(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
+	var appCtx = ctx.FromGinCtx(c)
 	var params dto.UserRoleCreateReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.UserRole().Create(ctx, params)
+	res, err := h.service.UserRole().Create(appCtx.Ctx, params)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }
 
 func (h *UserRoleHandlerImpl) Update(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
-	id, err := ctx.GetPathParamID("id")
+	var appCtx = ctx.FromGinCtx(c)
+	id, err := appCtx.GetPathParamID("id")
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
 	var params dto.UserRoleUpdateReqDto
-	if err := ctx.ShouldBind(&params); err != nil {
-		ctx.ToError(err)
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.UserRole().Update(ctx, id, params)
+	res, err := h.service.UserRole().Update(appCtx.Ctx, id, params)
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	ctx.ToSuccess(res)
+	appCtx.ToSuccess(res)
 }
 
 func (h *UserRoleHandlerImpl) Delete(c *gin.Context) {
-	var ctx = ctx.FromGinCtx(c)
-	id, err := ctx.GetPathParamID("id")
+	var appCtx = ctx.FromGinCtx(c)
+	id, err := appCtx.GetPathParamID("id")
 	if err != nil {
-		ctx.ToError(err)
+		appCtx.ToError(err)
 		return
 	}
-	if exc := h.service.UserRole().Delete(ctx, id); exc != nil {
-		ctx.ToError(exc)
+	if exc := h.service.UserRole().Delete(appCtx.Ctx, id); exc != nil {
+		appCtx.ToError(exc)
 		return
 	}
-	ctx.ToSuccess(nil)
+	appCtx.ToSuccess(nil)
 }
