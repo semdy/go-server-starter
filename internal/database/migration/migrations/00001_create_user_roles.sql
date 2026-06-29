@@ -1,6 +1,6 @@
 -- +goose Up
 CREATE TABLE user_roles (
-    id BIGINT UNSIGNED PRIMARY KEY,
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     created_at DATETIME(3) NULL,
     updated_at DATETIME(3) NULL,
     deleted_at DATETIME(3) NULL,
