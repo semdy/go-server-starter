@@ -1,5 +1,24 @@
 package main
 
+// @title           Go Server Starter API
+// @version         1.0
+// @description     生产就绪的 Go Web 服务脚手架，内置认证、RBAC 权限控制。
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name   API Support
+// @contact.email  support@example.com
+
+// @license.name  MIT
+// @license.url   https://github.com/your-username/go-server-starter/blob/main/LICENSE
+
+// @host      localhost:8080
+// @BasePath  /api
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description 输入 "Bearer {token}"，登录接口返回的 token
+
 import (
 	"fmt"
 	"os"

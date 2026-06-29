@@ -1,0 +1,513 @@
+basePath: /api
+definitions:
+  go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto:
+    properties:
+      code:
+        type: string
+      email:
+        type: string
+    required:
+    - code
+    - email
+    type: object
+  go-server-starter_internal_dto.AuthLoginByMobileAndCodeReqDto:
+    properties:
+      code:
+        type: string
+      countryCode:
+        type: string
+      mobile:
+        type: string
+    required:
+    - code
+    - countryCode
+    - mobile
+    type: object
+  go-server-starter_internal_dto.AuthTokenResDto:
+    properties:
+      token:
+        type: string
+    type: object
+  go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserListItemResDto:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserListItemResDto'
+        type: array
+      hasNext:
+        type: boolean
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPage:
+        type: integer
+    type: object
+  go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserRoleResDto:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserRoleResDto'
+        type: array
+      hasNext:
+        type: boolean
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPage:
+        type: integer
+    type: object
+  go-server-starter_internal_dto.UserInfoResDto:
+    properties:
+      avatarURL:
+        type: string
+      countryCode:
+        type: string
+      desc:
+        type: string
+      email:
+        type: string
+      mobile:
+        type: string
+      nickname:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
+      uniCode:
+        type: string
+    type: object
+  go-server-starter_internal_dto.UserListItemResDto:
+    properties:
+      avatarURL:
+        type: string
+      countryCode:
+        type: string
+      createdAt:
+        type: string
+      desc:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      mobile:
+        type: string
+      nickname:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
+      uniCode:
+        type: string
+    type: object
+  go-server-starter_internal_dto.UserRoleCreateReqDto:
+    properties:
+      code:
+        maxLength: 50
+        minLength: 1
+        type: string
+      enabled:
+        type: boolean
+    required:
+    - code
+    type: object
+  go-server-starter_internal_dto.UserRoleResDto:
+    properties:
+      code:
+        type: string
+      createdAt:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      updatedAt:
+        type: string
+    type: object
+  go-server-starter_internal_dto.UserRoleUpdateReqDto:
+    properties:
+      code:
+        maxLength: 50
+        minLength: 1
+        type: string
+      enabled:
+        type: boolean
+    type: object
+  go-server-starter_internal_dto.UserUpdateInfoReqDto:
+    properties:
+      avatarURL:
+        type: string
+      desc:
+        maxLength: 200
+        type: string
+      nickname:
+        maxLength: 20
+        minLength: 2
+        type: string
+    required:
+    - nickname
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+  description: 生产就绪的 Go Web 服务脚手架，内置认证、RBAC 权限控制。
+  license:
+    name: MIT
+    url: https://github.com/your-username/go-server-starter/blob/main/LICENSE
+  termsOfService: http://swagger.io/terms/
+  title: Go Server Starter API
+  version: "1.0"
+paths:
+  /auth/login/email:
+    post:
+      consumes:
+      - application/json
+      description: 邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实邮件服务。
+      parameters:
+      - description: 登录参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto'
+      - description: '设备类型: web/desktop/mobile/chromeExtension/api'
+        in: header
+        name: Device-Type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.AuthTokenResDto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 邮箱验证码登录
+      tags:
+      - auth
+  /auth/login/mobile:
+    post:
+      consumes:
+      - application/json
+      description: 手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实 SMS 服务。
+      parameters:
+      - description: 登录参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.AuthLoginByMobileAndCodeReqDto'
+      - description: '设备类型: web/desktop/mobile/chromeExtension/api'
+        in: header
+        name: Device-Type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.AuthTokenResDto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 手机验证码登录
+      tags:
+      - auth
+  /hello:
+    get:
+      consumes:
+      - application/json
+      description: 返回 Hello World，可选 name 参数返回多语言问候
+      parameters:
+      - description: 名称
+        in: query
+        name: name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 健康检查
+      tags:
+      - hello
+  /role:
+    post:
+      consumes:
+      - application/json
+      description: 创建新的角色。需要 admin 或 super_admin 角色。
+      parameters:
+      - description: 角色信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserRoleCreateReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRoleResDto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 创建角色
+      tags:
+      - role
+  /role/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 软删除指定角色。需要 admin 或 super_admin 角色。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 删除角色（软删除）
+      tags:
+      - role
+    get:
+      consumes:
+      - application/json
+      description: 根据 ID 查询角色详情。需要 admin 或 super_admin 角色。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRoleResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 查询角色
+      tags:
+      - role
+    put:
+      consumes:
+      - application/json
+      description: 更新角色代码或启用状态。需要 admin 或 super_admin 角色。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserRoleUpdateReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRoleResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 更新角色
+      tags:
+      - role
+  /role/table:
+    get:
+      consumes:
+      - application/json
+      description: 分页查询角色列表，支持按 code 和 enabled 筛选。需要 admin 或 super_admin 角色。
+      parameters:
+      - description: 角色代码
+        in: query
+        name: code
+        type: string
+      - description: 是否启用
+        in: query
+        name: enabled
+        type: boolean
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页条数
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserRoleResDto'
+      security:
+      - BearerAuth: []
+      summary: 角色列表
+      tags:
+      - role
+  /user/admin/table:
+    get:
+      consumes:
+      - application/json
+      description: 分页查询用户列表，支持按昵称、邮箱、手机号筛选。需要 admin 或 super_admin 角色。
+      parameters:
+      - description: 昵称（模糊）
+        in: query
+        name: nickname
+        type: string
+      - description: 邮箱（前缀匹配）
+        in: query
+        name: email
+        type: string
+      - description: 手机号（前缀匹配）
+        in: query
+        name: mobile
+        type: string
+      - description: 国家代码（前缀匹配）
+        in: query
+        name: countryCode
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页条数
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserListItemResDto'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 用户列表（管理员）
+      tags:
+      - user
+  /user/info:
+    get:
+      consumes:
+      - application/json
+      description: 根据 JWT token 中的 uniCode 返回用户详情及角色列表
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserInfoResDto'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 获取当前用户信息
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      description: 更新当前登录用户的昵称、头像、简介
+      parameters:
+      - description: 更新参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserUpdateInfoReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserInfoResDto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 更新用户信息
+      tags:
+      - user
+securityDefinitions:
+  BearerAuth:
+    description: 输入 "Bearer {token}"，登录接口返回的 token
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

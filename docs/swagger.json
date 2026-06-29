@@ -1,0 +1,784 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "生产就绪的 Go Web 服务脚手架，内置认证、RBAC 权限控制。",
+        "title": "Go Server Starter API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "email": "support@example.com"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://github.com/your-username/go-server-starter/blob/main/LICENSE"
+        },
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api",
+    "paths": {
+        "/auth/login/email": {
+            "post": {
+                "description": "邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实邮件服务。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "邮箱验证码登录",
+                "parameters": [
+                    {
+                        "description": "登录参数",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "设备类型: web/desktop/mobile/chromeExtension/api",
+                        "name": "Device-Type",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.AuthTokenResDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/login/mobile": {
+            "post": {
+                "description": "手机号 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实 SMS 服务。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "手机验证码登录",
+                "parameters": [
+                    {
+                        "description": "登录参数",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.AuthLoginByMobileAndCodeReqDto"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "description": "设备类型: web/desktop/mobile/chromeExtension/api",
+                        "name": "Device-Type",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.AuthTokenResDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/hello": {
+            "get": {
+                "description": "返回 Hello World，可选 name 参数返回多语言问候",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "hello"
+                ],
+                "summary": "健康检查",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "名称",
+                        "name": "name",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/role": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "创建新的角色。需要 admin 或 super_admin 角色。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "创建角色",
+                "parameters": [
+                    {
+                        "description": "角色信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleCreateReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleResDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/role/table": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询角色列表，支持按 code 和 enabled 筛选。需要 admin 或 super_admin 角色。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "角色列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "角色代码",
+                        "name": "code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "是否启用",
+                        "name": "enabled",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserRoleResDto"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "根据 ID 查询角色详情。需要 admin 或 super_admin 角色。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "查询角色",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleResDto"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新角色代码或启用状态。需要 admin 或 super_admin 角色。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "更新角色",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "更新参数",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleUpdateReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleResDto"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "软删除指定角色。需要 admin 或 super_admin 角色。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "删除角色（软删除）",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/user/admin/table": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询用户列表，支持按昵称、邮箱、手机号筛选。需要 admin 或 super_admin 角色。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "用户列表（管理员）",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "昵称（模糊）",
+                        "name": "nickname",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "邮箱（前缀匹配）",
+                        "name": "email",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "手机号（前缀匹配）",
+                        "name": "mobile",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "国家代码（前缀匹配）",
+                        "name": "countryCode",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserListItemResDto"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/user/info": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "根据 JWT token 中的 uniCode 返回用户详情及角色列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "获取当前用户信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserInfoResDto"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "更新当前登录用户的昵称、头像、简介",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "user"
+                ],
+                "summary": "更新用户信息",
+                "parameters": [
+                    {
+                        "description": "更新参数",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserUpdateInfoReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserInfoResDto"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto": {
+            "type": "object",
+            "required": [
+                "code",
+                "email"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.AuthLoginByMobileAndCodeReqDto": {
+            "type": "object",
+            "required": [
+                "code",
+                "countryCode",
+                "mobile"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "countryCode": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.AuthTokenResDto": {
+            "type": "object",
+            "properties": {
+                "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserListItemResDto": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.UserListItemResDto"
+                    }
+                },
+                "hasNext": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPage": {
+                    "type": "integer"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserRoleResDto": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleResDto"
+                    }
+                },
+                "hasNext": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPage": {
+                    "type": "integer"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserInfoResDto": {
+            "type": "object",
+            "properties": {
+                "avatarURL": {
+                    "type": "string"
+                },
+                "countryCode": {
+                    "type": "string"
+                },
+                "desc": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "uniCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserListItemResDto": {
+            "type": "object",
+            "properties": {
+                "avatarURL": {
+                    "type": "string"
+                },
+                "countryCode": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "desc": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "mobile": {
+                    "type": "string"
+                },
+                "nickname": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "uniCode": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserRoleCreateReqDto": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1
+                },
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserRoleResDto": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserRoleUpdateReqDto": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "minLength": 1
+                },
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserUpdateInfoReqDto": {
+            "type": "object",
+            "required": [
+                "nickname"
+            ],
+            "properties": {
+                "avatarURL": {
+                    "type": "string"
+                },
+                "desc": {
+                    "type": "string",
+                    "maxLength": 200
+                },
+                "nickname": {
+                    "type": "string",
+                    "maxLength": 20,
+                    "minLength": 2
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "输入 \"Bearer {token}\"，登录接口返回的 token",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

@@ -7,6 +7,10 @@ import (
 	"go-server-starter/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "go-server-starter/docs" // swag generated docs
 )
 
 type Router struct {
@@ -33,4 +37,7 @@ func (r *Router) SetupRoutes() {
 
 	// UserRole - 角色管理（管理员）
 	r.SetupUserRoleRoutes()
+
+	// Swagger API 文档
+	r.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

@@ -26,6 +26,17 @@ func NewUserRoleHandler(logger *zap.Logger, service service.Service) UserRoleHan
 	return &UserRoleHandlerImpl{logger: logger, service: service}
 }
 
+// GetByID godoc
+// @Summary      查询角色
+// @Description  根据 ID 查询角色详情。需要 admin 或 super_admin 角色。
+// @Tags         role
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "角色 ID"
+// @Success      200  {object}  dto.UserRoleResDto
+// @Failure      404  {object}  map[string]interface{}
+// @Router       /role/{id} [get]
 func (h *UserRoleHandlerImpl) GetByID(c *gin.Context) {
 	var appCtx = ctx.FromGinCtx(c)
 	id, err := appCtx.GetPathParamID("id")
@@ -41,6 +52,19 @@ func (h *UserRoleHandlerImpl) GetByID(c *gin.Context) {
 	appCtx.ToSuccess(res)
 }
 
+// GetTable godoc
+// @Summary      角色列表
+// @Description  分页查询角色列表，支持按 code 和 enabled 筛选。需要 admin 或 super_admin 角色。
+// @Tags         role
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        code     query     string  false  "角色代码"
+// @Param        enabled  query     bool    false  "是否启用"
+// @Param        page     query     int     false  "页码"  default(1)
+// @Param        pageSize query     int     false  "每页条数" default(20)
+// @Success      200      {object}  dto.PaginationResDto[[]dto.UserRoleResDto]
+// @Router       /role/table [get]
 func (h *UserRoleHandlerImpl) GetTable(c *gin.Context) {
 	var appCtx = ctx.FromGinCtx(c)
 	var params dto.UserRoleTableQueryReqDto
@@ -56,6 +80,17 @@ func (h *UserRoleHandlerImpl) GetTable(c *gin.Context) {
 	appCtx.ToSuccess(res)
 }
 
+// Create godoc
+// @Summary      创建角色
+// @Description  创建新的角色。需要 admin 或 super_admin 角色。
+// @Tags         role
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      dto.UserRoleCreateReqDto  true  "角色信息"
+// @Success      200   {object}  dto.UserRoleResDto
+// @Failure      400   {object}  map[string]interface{}
+// @Router       /role [post]
 func (h *UserRoleHandlerImpl) Create(c *gin.Context) {
 	var appCtx = ctx.FromGinCtx(c)
 	var params dto.UserRoleCreateReqDto
@@ -71,6 +106,18 @@ func (h *UserRoleHandlerImpl) Create(c *gin.Context) {
 	appCtx.ToSuccess(res)
 }
 
+// Update godoc
+// @Summary      更新角色
+// @Description  更新角色代码或启用状态。需要 admin 或 super_admin 角色。
+// @Tags         role
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id    path      int                        true  "角色 ID"
+// @Param        body  body      dto.UserRoleUpdateReqDto  true  "更新参数"
+// @Success      200   {object}  dto.UserRoleResDto
+// @Failure      404   {object}  map[string]interface{}
+// @Router       /role/{id} [put]
 func (h *UserRoleHandlerImpl) Update(c *gin.Context) {
 	var appCtx = ctx.FromGinCtx(c)
 	id, err := appCtx.GetPathParamID("id")
@@ -91,6 +138,16 @@ func (h *UserRoleHandlerImpl) Update(c *gin.Context) {
 	appCtx.ToSuccess(res)
 }
 
+// Delete godoc
+// @Summary      删除角色（软删除）
+// @Description  软删除指定角色。需要 admin 或 super_admin 角色。
+// @Tags         role
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "角色 ID"
+// @Success      200  {object}  map[string]interface{}
+// @Router       /role/{id} [delete]
 func (h *UserRoleHandlerImpl) Delete(c *gin.Context) {
 	var appCtx = ctx.FromGinCtx(c)
 	id, err := appCtx.GetPathParamID("id")

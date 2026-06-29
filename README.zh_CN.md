@@ -181,7 +181,22 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/auth/login/email` | 邮箱 + 验证码登录 | 否 |
 | GET | `/api/user/info` | 获取当前用户信息 | 是 |
 | PUT | `/api/user/info` | 更新用户信息 | 是 |
-| GET | `/api/user/table` | 获取用户列表（分页） | 是 |
+| GET | `/api/user/admin/table` | 获取用户列表（分页） | admin+ |
+| GET | `/api/role/table` | 角色列表（分页） | admin+ |
+| GET | `/api/role/{id}` | 查询角色详情 | admin+ |
+| POST | `/api/role` | 创建角色 | admin+ |
+| PUT | `/api/role/{id}` | 更新角色 | admin+ |
+| DELETE | `/api/role/{id}` | 删除角色（软删除） | admin+ |
+
+### Swagger UI
+
+启动服务后访问 `http://localhost:8080/api/swagger/index.html` 即可使用交互式 API 文档。点击右上角 **Authorize** 按钮，输入 `Bearer {token}` 即可测试需要认证的接口。
+
+修改 API 注解后重新生成文档：
+
+```bash
+swag init -g cmd/server/server.go -o docs
+```
 
 ## 🌍 国际化
 

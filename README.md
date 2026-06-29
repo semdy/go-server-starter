@@ -181,7 +181,22 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/auth/login/email` | Login via email + code | No |
 | GET | `/api/user/info` | Get current user info | Yes |
 | PUT | `/api/user/info` | Update user info | Yes |
-| GET | `/api/user/table` | Get users list (paginated) | Yes |
+| GET | `/api/user/admin/table` | Get users list (paginated) | admin+ |
+| GET | `/api/role/table` | List roles (paginated) | admin+ |
+| GET | `/api/role/{id}` | Get role by ID | admin+ |
+| POST | `/api/role` | Create role | admin+ |
+| PUT | `/api/role/{id}` | Update role | admin+ |
+| DELETE | `/api/role/{id}` | Delete role (soft) | admin+ |
+
+### Swagger UI
+
+Start the server and open `http://localhost:8080/api/swagger/index.html` for interactive API documentation. Use the **Authorize** button to set `Bearer {token}` for authenticated endpoints.
+
+To regenerate docs after changing API annotations:
+
+```bash
+swag init -g cmd/server/server.go -o docs
+```
 
 ## 🌍 Internationalization
 
