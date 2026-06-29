@@ -23,6 +23,162 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/tasks/archived": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "列出所有重试耗尽已归档的任务。仅 super_admin 可访问。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "死信任务列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "default",
+                        "description": "队列名",
+                        "name": "queue",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/go-server-starter_internal_dto.ArchivedTaskItem"
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "永久删除指定已归档任务。仅 super_admin 可访问。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "删除死信任务",
+                "parameters": [
+                    {
+                        "description": "任务信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.RunTaskReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/tasks/archived/run": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "将指定已归档任务重新入队执行。仅 super_admin 可访问。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "重试单个死信任务",
+                "parameters": [
+                    {
+                        "description": "任务信息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.RunTaskReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/tasks/archived/run-all": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "将指定队列中所有已归档任务重新入队。仅 super_admin 可访问。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin"
+                ],
+                "summary": "重试全部死信任务",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "default": "default",
+                        "description": "队列名",
+                        "name": "queue",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login/email": {
             "post": {
                 "description": "邮箱 + 验证码登录，未注册自动创建账号并绑定 user 角色。当前验证码仅校验非空，待接入真实邮件服务。",
@@ -545,6 +701,35 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "go-server-starter_internal_dto.ArchivedTaskItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "lastErr": {
+                    "type": "string"
+                },
+                "maxRetry": {
+                    "type": "integer"
+                },
+                "payload": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "queue": {
+                    "type": "string"
+                },
+                "retried": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
         "go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto": {
             "type": "object",
             "required": [
@@ -636,6 +821,21 @@ const docTemplate = `{
                 },
                 "totalPage": {
                     "type": "integer"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.RunTaskReq": {
+            "type": "object",
+            "required": [
+                "queue",
+                "taskId"
+            ],
+            "properties": {
+                "queue": {
+                    "type": "string"
+                },
+                "taskId": {
+                    "type": "string"
                 }
             }
         },

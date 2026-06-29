@@ -11,6 +11,7 @@ import (
 	"go-server-starter/pkg/jwt"
 	"go-server-starter/pkg/taskq"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -89,14 +90,15 @@ func (s *AuthServiceImpl) loginOrRegister(
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
 
-		// Enqueue welcome email for new user (fire-and-forget)
+		// Enqueue welcome email for new user (idempotent, fire-and-forget)
 		if s.taskq != nil && user.Email != "" {
 			task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
 				UserUniCode: user.UniCode,
 				Email:       user.Email,
 			})
 			if task != nil {
-				if _, err := s.taskq.Enqueue(ctx, task, taskq.RetryByType(taskq.TaskEmailWelcome)...); err != nil {
+				uniqueKey := taskq.WelcomeEmailUniqueKey(user.UniCode)
+				if _, err := s.taskq.EnqueueUnique(ctx, task, uniqueKey, 24*time.Hour, taskq.RetryByType(taskq.TaskEmailWelcome)...); err != nil {
 					s.logger.Warn("failed to enqueue welcome email", zap.Error(err))
 				}
 			}

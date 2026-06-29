@@ -200,6 +200,10 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/role` | 创建角色 | admin+ |
 | PUT | `/api/role/{id}` | 更新角色 | admin+ |
 | DELETE | `/api/role/{id}` | 删除角色（软删除） | admin+ |
+| GET | `/api/admin/tasks/archived` | 死信任务列表 | super_admin |
+| POST | `/api/admin/tasks/archived/run` | 重试单个死信任务 | super_admin |
+| POST | `/api/admin/tasks/archived/run-all` | 重试全部死信任务 | super_admin |
+| DELETE | `/api/admin/tasks/archived` | 删除死信任务 | super_admin |
 
 ### Swagger UI
 
@@ -283,14 +287,36 @@ task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
     UserUniCode: user.UniCode,
     Email:       user.Email,
 })
-s.taskq.Enqueue(ctx, task, taskq.RetryByType(taskq.TaskEmailWelcome)...)
+uniqueKey := taskq.WelcomeEmailUniqueKey(user.UniCode)
+s.taskq.EnqueueUnique(ctx, task, uniqueKey, 24*time.Hour,
+    taskq.RetryByType(taskq.TaskEmailWelcome)...)
 ```
 
-### 重试与告警
+### 重试、幂等与告警
 
 - **按任务定制重试**：`RetryByType(taskType)` 返回该任务专属的 `MaxRetry` 和 `Timeout`。
+- **幂等**：`EnqueueUnique` 基于 `asynq.Unique`（Redis SETNX），同一 key 在 TTL 窗口内不会重复入队。多次调用安全。
 - **重试耗尽**：`ErrorHandler` 记录错误日志，并调用 `Alerter` 接口。
 - **Alerter 接口**：可插拔——实现 `Alerter` 接口即可接入 Slack、Webhook 或写入死信表。通过 `taskq.NewServer(..., alerter)` 传入，默认不告警。
+
+### 监控与死信管理
+
+**控制台**：安装 [asynqmon](https://github.com/hibiken/asynqmon)，指向 AsynQ 的 Redis DB：
+
+```bash
+go install github.com/hibiken/asynq/tools/asynqmon@latest
+asynqmon --redis-addr=localhost:6379 --redis-password=root --redis-db=1
+# 浏览器打开 http://localhost:8081
+```
+
+**手动重试**已归档（重试耗尽）的任务，通过 `taskq.Client`：
+
+```go
+tasks, _ := client.ListArchivedTasks("default")
+client.RunArchivedTask("default", taskID)   // 重试单个
+client.RunAllArchivedTasks("default")       // 全部重试
+client.DeleteArchivedTask("default", taskID) // 永久删除
+```
 
 ### 优雅关闭
 

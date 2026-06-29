@@ -22,10 +22,23 @@ type EmailWelcomePayload struct {
 	Email       string `json:"email"`
 }
 
+// ----- Unique key helpers -----
+
+// UniqueKey returns a unique dedup key for the given task type and ID.
+// Use with Client.EnqueueUnique to prevent duplicate tasks within the dedup window.
+func UniqueKey(taskType, id string) string {
+	return taskType + ":" + id
+}
+
+// WelcomeEmailUniqueKey returns the dedup key for a welcome email task.
+func WelcomeEmailUniqueKey(userUniCode string) string {
+	return UniqueKey(TaskEmailWelcome, userUniCode)
+}
+
 // ----- Retry helpers -----
 
 // RetryByType returns task-specific retry options.
-// Use to customize retry count and backoff per task type.
+// Includes MaxRetry, Timeout, and a 24h Unique TTL for idempotent enqueue.
 func RetryByType(taskType string) []asynq.Option {
 	switch taskType {
 	case TaskEmailWelcome:

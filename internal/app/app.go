@@ -194,6 +194,7 @@ func (a *App) Start() error {
 	// 初始化handler
 	a.handler = handler.NewHandler(
 		a.service,
+		a.taskqClient,
 		a.logger.Named("HANDLER"),
 	)
 	// 初始化ratelimit

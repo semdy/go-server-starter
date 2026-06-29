@@ -38,6 +38,9 @@ func (r *Router) SetupRoutes() {
 	// UserRole - 角色管理（管理员）
 	r.SetupUserRoleRoutes()
 
+	// Admin Tasks - 死信队列管理（超级管理员）
+	r.SetupAdminTaskRoutes()
+
 	// Swagger API 文档
 	r.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

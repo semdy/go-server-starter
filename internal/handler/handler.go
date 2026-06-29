@@ -2,6 +2,7 @@ package handler
 
 import (
 	"go-server-starter/internal/service"
+	"go-server-starter/pkg/taskq"
 
 	"go.uber.org/zap"
 )
@@ -11,6 +12,7 @@ type Handler interface {
 	User() UserHandler
 	UserRole() UserRoleHandler
 	Auth() AuthHandler
+	Task() TaskHandler
 }
 
 type HandlerImpl struct {
@@ -19,15 +21,17 @@ type HandlerImpl struct {
 	userHandler     UserHandler
 	userRoleHandler UserRoleHandler
 	authHandler     AuthHandler
+	taskHandler     TaskHandler
 }
 
-func NewHandler(service service.Service, logger *zap.Logger) Handler {
+func NewHandler(service service.Service, taskqClient *taskq.Client, logger *zap.Logger) Handler {
 	return &HandlerImpl{
 		logger:          logger,
 		helloHandler:    NewHelloHandler(logger),
 		userHandler:     NewUserHandler(logger, service),
 		userRoleHandler: NewUserRoleHandler(logger, service),
 		authHandler:     NewAuthHandler(logger, service),
+		taskHandler:     NewTaskHandler(logger, taskqClient),
 	}
 }
 
@@ -45,4 +49,8 @@ func (h *HandlerImpl) UserRole() UserRoleHandler {
 
 func (h *HandlerImpl) Auth() AuthHandler {
 	return h.authHandler
+}
+
+func (h *HandlerImpl) Task() TaskHandler {
+	return h.taskHandler
 }

@@ -200,6 +200,10 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/role` | Create role | admin+ |
 | PUT | `/api/role/{id}` | Update role | admin+ |
 | DELETE | `/api/role/{id}` | Delete role (soft) | admin+ |
+| GET | `/api/admin/tasks/archived` | List dead-letter tasks | super_admin |
+| POST | `/api/admin/tasks/archived/run` | Retry one dead-letter task | super_admin |
+| POST | `/api/admin/tasks/archived/run-all` | Retry all dead-letter tasks | super_admin |
+| DELETE | `/api/admin/tasks/archived` | Delete one dead-letter task | super_admin |
 
 ### Swagger UI
 
@@ -283,14 +287,36 @@ task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
     UserUniCode: user.UniCode,
     Email:       user.Email,
 })
-s.taskq.Enqueue(ctx, task, taskq.RetryByType(taskq.TaskEmailWelcome)...)
+uniqueKey := taskq.WelcomeEmailUniqueKey(user.UniCode)
+s.taskq.EnqueueUnique(ctx, task, uniqueKey, 24*time.Hour,
+    taskq.RetryByType(taskq.TaskEmailWelcome)...)
 ```
 
-### Retry & alerting
+### Retry, idempotency & alerting
 
 - **Per-task retry**: `RetryByType(taskType)` returns `MaxRetry` + `Timeout` tuned per task.
+- **Idempotency**: `EnqueueUnique` uses `asynq.Unique` (Redis SETNX) to deduplicate tasks with the same key within a TTL window. Safe to call multiple times.
 - **Exhausted retries**: `ErrorHandler` logs the failure and calls the `Alerter` interface.
 - **Alerter**: pluggable — implement the `Alerter` interface to send Slack, webhook, or write to a dead-letter table. Pass your implementation to `taskq.NewServer(..., alerter)`. Default is no-op.
+
+### Monitoring & dead-letter
+
+**Dashboard**: install [asynqmon](https://github.com/hibiken/asynqmon) and point it at the AsynQ Redis DB:
+
+```bash
+go install github.com/hibiken/asynq/tools/asynqmon@latest
+asynqmon --redis-addr=localhost:6379 --redis-password=root --redis-db=1
+# open http://localhost:8081
+```
+
+**Manual retry** of archived (retry-exhausted) tasks via `taskq.Client`:
+
+```go
+tasks, _ := client.ListArchivedTasks("default")
+client.RunArchivedTask("default", taskID)   // retry one
+client.RunAllArchivedTasks("default")       // retry all
+client.DeleteArchivedTask("default", taskID) // delete permanently
+```
 
 ### Graceful shutdown
 
