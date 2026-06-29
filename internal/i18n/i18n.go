@@ -29,8 +29,25 @@ func NormalizeLocale(locale string) string {
 	return DEFAULT_LOCALE
 }
 
-// T returns the translated message for the given locale
+// T returns the translated message for the given locale.
 func (m Text) T(locale string, params ...map[string]string) string {
+	return m.translate(locale, params...)
+}
+
+// Tf is like T but takes key-value pairs instead of a map.
+// Usage: i18n.EchoHello.Tf(ctx.GetLocale(), "name", name)
+func (m Text) Tf(locale string, kv ...string) string {
+	if len(kv)%2 != 0 {
+		return m.translate(locale) // odd count, ignore params
+	}
+	params := make(map[string]string, len(kv)/2)
+	for i := 0; i < len(kv); i += 2 {
+		params[kv[i]] = kv[i+1]
+	}
+	return m.translate(locale, params)
+}
+
+func (m Text) translate(locale string, params ...map[string]string) string {
 	var message string
 	switch NormalizeLocale(locale) {
 	case LOCALE_ZH:
@@ -38,14 +55,12 @@ func (m Text) T(locale string, params ...map[string]string) string {
 	case LOCALE_EN:
 		message = m.En
 	default:
-		message = m.Zh // default to Chinese
+		message = m.Zh
 	}
 
-	// Replace placeholders with params
 	if len(params) > 0 && params[0] != nil {
 		for k, v := range params[0] {
-			placeholder := fmt.Sprintf("{%s}", k)
-			message = strings.ReplaceAll(message, placeholder, v)
+			message = strings.ReplaceAll(message, fmt.Sprintf("{%s}", k), v)
 		}
 	}
 
