@@ -26,6 +26,7 @@ func (m *mockRepo) Logger() *zap.Logger                      { return zap.NewNop
 func (m *mockRepo) Transaction(_ context.Context, _ func(tx *gorm.DB) error) error { return nil }
 func (m *mockRepo) User() repo.UserRepo                      { return m.userRepo }
 func (m *mockRepo) UserRole() repo.UserRoleRepo              { return m.userRoleRepo }
+func (m *mockRepo) DeadLetter() repo.DeadLetterRepo          { return nil }
 
 // stubUserRepo is a minimal stub — only methods actually called are implemented.
 type stubUserRepo struct {

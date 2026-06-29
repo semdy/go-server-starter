@@ -23,14 +23,14 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/tasks/archived": {
+        "/admin/dead-letters": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "列出所有重试耗尽已归档的任务。仅 super_admin 可访问。",
+                "description": "分页查询已落库的死信记录。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -40,13 +40,30 @@ const docTemplate = `{
                 "tags": [
                     "admin"
                 ],
-                "summary": "死信任务列表",
+                "summary": "死信列表（DB）",
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "default",
-                        "description": "队列名",
-                        "name": "queue",
+                        "description": "任务类型",
+                        "name": "taskType",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "是否已重试",
+                        "name": "isRetried",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "pageSize",
                         "in": "query"
                     }
                 ],
@@ -54,10 +71,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/go-server-starter_internal_dto.ArchivedTaskItem"
-                            }
+                            "$ref": "#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem"
                         }
                     }
                 }
@@ -68,7 +82,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "永久删除指定已归档任务。仅 super_admin 可访问。",
+                "description": "物理删除指定死信记录。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -78,15 +92,15 @@ const docTemplate = `{
                 "tags": [
                     "admin"
                 ],
-                "summary": "删除死信任务",
+                "summary": "删除死信记录",
                 "parameters": [
                     {
-                        "description": "任务信息",
+                        "description": "死信 ID",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/go-server-starter_internal_dto.RunTaskReq"
+                            "$ref": "#/definitions/go-server-starter_internal_dto.RetryDeadLetterReq"
                         }
                     }
                 ],
@@ -101,14 +115,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/tasks/archived/run": {
+        "/admin/dead-letters/retry": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "将指定已归档任务重新入队执行。仅 super_admin 可访问。",
+                "description": "将指定死信任务重新入队，并标记为已重试。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -118,15 +132,15 @@ const docTemplate = `{
                 "tags": [
                     "admin"
                 ],
-                "summary": "重试单个死信任务",
+                "summary": "重试单条死信",
                 "parameters": [
                     {
-                        "description": "任务信息",
+                        "description": "死信 ID",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/go-server-starter_internal_dto.RunTaskReq"
+                            "$ref": "#/definitions/go-server-starter_internal_dto.RetryDeadLetterReq"
                         }
                     }
                 ],
@@ -141,14 +155,14 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/tasks/archived/run-all": {
+        "/admin/dead-letters/retry-all": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "将指定队列中所有已归档任务重新入队。仅 super_admin 可访问。",
+                "description": "将指定类型的所有未重试死信重新入队。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -158,14 +172,14 @@ const docTemplate = `{
                 "tags": [
                     "admin"
                 ],
-                "summary": "重试全部死信任务",
+                "summary": "批量重试死信",
                 "parameters": [
                     {
                         "type": "string",
-                        "default": "default",
-                        "description": "队列名",
-                        "name": "queue",
-                        "in": "query"
+                        "description": "任务类型",
+                        "name": "taskType",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -173,7 +187,9 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "type": "object",
-                            "additionalProperties": true
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
                         }
                     }
                 }
@@ -771,35 +787,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "go-server-starter_internal_dto.ArchivedTaskItem": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "lastErr": {
-                    "type": "string"
-                },
-                "maxRetry": {
-                    "type": "integer"
-                },
-                "payload": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "queue": {
-                    "type": "string"
-                },
-                "retried": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string"
-                }
-            }
-        },
         "go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto": {
             "type": "object",
             "required": [
@@ -839,6 +826,64 @@ const docTemplate = `{
             "properties": {
                 "token": {
                     "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.DeadLetterItem": {
+            "type": "object",
+            "properties": {
+                "attempt": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "failedAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "isRetried": {
+                    "type": "boolean"
+                },
+                "maxRetry": {
+                    "type": "integer"
+                },
+                "queue": {
+                    "type": "string"
+                },
+                "taskId": {
+                    "type": "string"
+                },
+                "taskType": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.DeadLetterItem"
+                    }
+                },
+                "hasNext": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPage": {
+                    "type": "integer"
                 }
             }
         },
@@ -894,18 +939,14 @@ const docTemplate = `{
                 }
             }
         },
-        "go-server-starter_internal_dto.RunTaskReq": {
+        "go-server-starter_internal_dto.RetryDeadLetterReq": {
             "type": "object",
             "required": [
-                "queue",
-                "taskId"
+                "id"
             ],
             "properties": {
-                "queue": {
-                    "type": "string"
-                },
-                "taskId": {
-                    "type": "string"
+                "id": {
+                    "type": "integer"
                 }
             }
         },

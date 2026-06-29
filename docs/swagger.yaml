@@ -1,24 +1,5 @@
 basePath: /api
 definitions:
-  go-server-starter_internal_dto.ArchivedTaskItem:
-    properties:
-      id:
-        type: string
-      lastErr:
-        type: string
-      maxRetry:
-        type: integer
-      payload:
-        items:
-          type: integer
-        type: array
-      queue:
-        type: string
-      retried:
-        type: integer
-      type:
-        type: string
-    type: object
   go-server-starter_internal_dto.AuthLoginByEmailAndCodeReqDto:
     properties:
       code:
@@ -46,6 +27,44 @@ definitions:
     properties:
       token:
         type: string
+    type: object
+  go-server-starter_internal_dto.DeadLetterItem:
+    properties:
+      attempt:
+        type: integer
+      error:
+        type: string
+      failedAt:
+        type: string
+      id:
+        type: integer
+      isRetried:
+        type: boolean
+      maxRetry:
+        type: integer
+      queue:
+        type: string
+      taskId:
+        type: string
+      taskType:
+        type: string
+    type: object
+  go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.DeadLetterItem'
+        type: array
+      hasNext:
+        type: boolean
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPage:
+        type: integer
     type: object
   go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_UserListItemResDto:
     properties:
@@ -81,15 +100,12 @@ definitions:
       totalPage:
         type: integer
     type: object
-  go-server-starter_internal_dto.RunTaskReq:
+  go-server-starter_internal_dto.RetryDeadLetterReq:
     properties:
-      queue:
-        type: string
-      taskId:
-        type: string
+      id:
+        type: integer
     required:
-    - queue
-    - taskId
+    - id
     type: object
   go-server-starter_internal_dto.SendEmailCodeReqDto:
     properties:
@@ -214,18 +230,18 @@ info:
   title: Go Server Starter API
   version: "1.0"
 paths:
-  /admin/tasks/archived:
+  /admin/dead-letters:
     delete:
       consumes:
       - application/json
-      description: 永久删除指定已归档任务。仅 super_admin 可访问。
+      description: 物理删除指定死信记录。仅 super_admin 可访问。
       parameters:
-      - description: 任务信息
+      - description: 死信 ID
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/go-server-starter_internal_dto.RunTaskReq'
+          $ref: '#/definitions/go-server-starter_internal_dto.RetryDeadLetterReq'
       produces:
       - application/json
       responses:
@@ -236,45 +252,54 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: 删除死信任务
+      summary: 删除死信记录
       tags:
       - admin
     get:
       consumes:
       - application/json
-      description: 列出所有重试耗尽已归档的任务。仅 super_admin 可访问。
+      description: 分页查询已落库的死信记录。仅 super_admin 可访问。
       parameters:
-      - default: default
-        description: 队列名
+      - description: 任务类型
         in: query
-        name: queue
+        name: taskType
         type: string
+      - description: 是否已重试
+        in: query
+        name: isRetried
+        type: boolean
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: pageSize
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/go-server-starter_internal_dto.ArchivedTaskItem'
-            type: array
+            $ref: '#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem'
       security:
       - BearerAuth: []
-      summary: 死信任务列表
+      summary: 死信列表（DB）
       tags:
       - admin
-  /admin/tasks/archived/run:
+  /admin/dead-letters/retry:
     post:
       consumes:
       - application/json
-      description: 将指定已归档任务重新入队执行。仅 super_admin 可访问。
+      description: 将指定死信任务重新入队，并标记为已重试。仅 super_admin 可访问。
       parameters:
-      - description: 任务信息
+      - description: 死信 ID
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/go-server-starter_internal_dto.RunTaskReq'
+          $ref: '#/definitions/go-server-starter_internal_dto.RetryDeadLetterReq'
       produces:
       - application/json
       responses:
@@ -285,19 +310,19 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: 重试单个死信任务
+      summary: 重试单条死信
       tags:
       - admin
-  /admin/tasks/archived/run-all:
+  /admin/dead-letters/retry-all:
     post:
       consumes:
       - application/json
-      description: 将指定队列中所有已归档任务重新入队。仅 super_admin 可访问。
+      description: 将指定类型的所有未重试死信重新入队。仅 super_admin 可访问。
       parameters:
-      - default: default
-        description: 队列名
+      - description: 任务类型
         in: query
-        name: queue
+        name: taskType
+        required: true
         type: string
       produces:
       - application/json
@@ -305,11 +330,12 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
+            additionalProperties:
+              type: integer
             type: object
       security:
       - BearerAuth: []
-      summary: 重试全部死信任务
+      summary: 批量重试死信
       tags:
       - admin
   /auth/login/email:

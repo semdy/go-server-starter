@@ -3,6 +3,7 @@ package taskq
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"go-server-starter/internal/config"
 
 	"github.com/hibiken/asynq"
@@ -16,19 +17,31 @@ type ServerConfig struct {
 }
 
 // Server wraps an Asynq server with pre-configured mux, error handling, and alerting.
+type alerterPtr struct{ v atomic.Pointer[Alerter] }
+
+func (a *alerterPtr) get() Alerter {
+	if p := a.v.Load(); p != nil {
+		return *p
+	}
+	return noopAlerter{}
+}
+func (a *alerterPtr) set(impl Alerter) { a.v.Store(&impl) }
+
 type Server struct {
 	*asynq.Server
 	mux         *asynq.ServeMux
 	logger      *zap.Logger
 	concurrency int
+	alerter     *alerterPtr
 }
 
 // NewServer creates a new Asynq server connected to the configured Redis.
 // Pass nil for alerter to use the default (no-op) implementation.
 func NewServer(redisConfig config.AsynQConfig, cfg ServerConfig, logger *zap.Logger, alerter Alerter) *Server {
 	logger = logger.Named("TASKQ")
-	if alerter == nil {
-		alerter = noopAlerter{}
+	a := &alerterPtr{}
+	if alerter != nil {
+		a.set(alerter)
 	}
 	srv := asynq.NewServer(
 		asynq.RedisClientOpt{
@@ -51,7 +64,7 @@ func NewServer(redisConfig config.AsynQConfig, cfg ServerConfig, logger *zap.Log
 						zap.Int("maxRetry", maxRetry),
 						zap.Error(err),
 					)
-					alerter.Alert(ctx, AlertInfo{
+					a.get().Alert(ctx, AlertInfo{
 						TaskType: task.Type(),
 						TaskID:   task.ResultWriter().TaskID(),
 						Payload:  task.Payload(),
@@ -71,8 +84,11 @@ func NewServer(redisConfig config.AsynQConfig, cfg ServerConfig, logger *zap.Log
 			}),
 		},
 	)
-	return &Server{Server: srv, mux: asynq.NewServeMux(), logger: logger, concurrency: cfg.Concurrency}
+	return &Server{Server: srv, mux: asynq.NewServeMux(), logger: logger, concurrency: cfg.Concurrency, alerter: a}
 }
+
+// SetAlerter replaces the active alerter. Safe for concurrent use.
+func (s *Server) SetAlerter(impl Alerter) { s.alerter.set(impl) }
 
 // Handle registers a task handler for the given pattern.
 func (s *Server) Handle(pattern string, handler asynq.Handler) {

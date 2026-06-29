@@ -216,6 +216,9 @@ func (a *App) Start() error {
 		a.taskqClient,
 		a.logger.Named("SERVICE"),
 	)
+	// 设置死信告警器（任务重试耗尽后自动落库）
+	a.taskqServer.SetAlerter(a.service.DeadLetter())
+
 	// 初始化auth
 	a.auth = auth.NewAuth(a.service, a.logger.Named("AUTH"))
 	// 初始化handler

@@ -13,21 +13,24 @@ type Repo interface {
 	Transaction(ctx context.Context, fn func(tx *gorm.DB) error) error
 	User() UserRepo
 	UserRole() UserRoleRepo
+	DeadLetter() DeadLetterRepo
 }
 
 type RepoImpl struct {
-	db           *gorm.DB
-	logger       *zap.Logger
-	userRepo     UserRepo
-	userRoleRepo UserRoleRepo
+	db              *gorm.DB
+	logger          *zap.Logger
+	userRepo        UserRepo
+	userRoleRepo    UserRoleRepo
+	deadLetterRepo  DeadLetterRepo
 }
 
 func NewRepo(db *gorm.DB, logger *zap.Logger) Repo {
 	return &RepoImpl{
-		db:           db,
-		logger:       logger,
-		userRepo:     NewUserRepo(db, logger),
-		userRoleRepo: NewUserRoleRepo(db, logger),
+		db:             db,
+		logger:         logger,
+		userRepo:       NewUserRepo(db, logger),
+		userRoleRepo:   NewUserRoleRepo(db, logger),
+		deadLetterRepo: NewDeadLetterRepo(db, logger),
 	}
 }
 
@@ -49,4 +52,8 @@ func (r *RepoImpl) User() UserRepo {
 
 func (r *RepoImpl) UserRole() UserRoleRepo {
 	return r.userRoleRepo
+}
+
+func (r *RepoImpl) DeadLetter() DeadLetterRepo {
+	return r.deadLetterRepo
 }

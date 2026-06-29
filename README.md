@@ -202,10 +202,14 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/role` | Create role | admin+ |
 | PUT | `/api/role/{id}` | Update role | admin+ |
 | DELETE | `/api/role/{id}` | Delete role (soft) | admin+ |
-| GET | `/api/admin/tasks/archived` | List dead-letter tasks | super_admin |
+| GET | `/api/admin/tasks/archived` | List dead-letter tasks (Redis) | super_admin |
 | POST | `/api/admin/tasks/archived/run` | Retry one dead-letter task | super_admin |
 | POST | `/api/admin/tasks/archived/run-all` | Retry all dead-letter tasks | super_admin |
 | DELETE | `/api/admin/tasks/archived` | Delete one dead-letter task | super_admin |
+| GET | `/api/admin/dead-letters` | List dead letters (DB) | super_admin |
+| POST | `/api/admin/dead-letters/retry` | Retry one dead letter | super_admin |
+| POST | `/api/admin/dead-letters/retry-all` | Retry all by type | super_admin |
+| DELETE | `/api/admin/dead-letters` | Delete dead letter | super_admin |
 
 ### Swagger UI
 

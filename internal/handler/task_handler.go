@@ -78,7 +78,6 @@ func (h *TaskHandlerImpl) RunArchived(c *gin.Context) {
 		appCtx.ToError(err)
 		return
 	}
-
 	if err := h.client.RunArchivedTask(params.Queue, params.TaskID); err != nil {
 		appCtx.ToError(exception.InternalServerError.Append(err.Error()))
 		return
@@ -125,7 +124,6 @@ func (h *TaskHandlerImpl) DeleteArchived(c *gin.Context) {
 		appCtx.ToError(err)
 		return
 	}
-
 	if err := h.client.DeleteArchivedTask(params.Queue, params.TaskID); err != nil {
 		appCtx.ToError(exception.InternalServerError.Append(err.Error()))
 		return

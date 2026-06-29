@@ -200,10 +200,14 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/role` | 创建角色 | admin+ |
 | PUT | `/api/role/{id}` | 更新角色 | admin+ |
 | DELETE | `/api/role/{id}` | 删除角色（软删除） | admin+ |
-| GET | `/api/admin/tasks/archived` | 死信任务列表 | super_admin |
+| GET | `/api/admin/tasks/archived` | 死信任务列表（Redis） | super_admin |
 | POST | `/api/admin/tasks/archived/run` | 重试单个死信任务 | super_admin |
 | POST | `/api/admin/tasks/archived/run-all` | 重试全部死信任务 | super_admin |
 | DELETE | `/api/admin/tasks/archived` | 删除死信任务 | super_admin |
+| GET | `/api/admin/dead-letters` | 死信列表（DB） | super_admin |
+| POST | `/api/admin/dead-letters/retry` | 重试单条死信 | super_admin |
+| POST | `/api/admin/dead-letters/retry-all` | 按类型批量重试 | super_admin |
+| DELETE | `/api/admin/dead-letters` | 删除死信 | super_admin |
 
 ### Swagger UI
 

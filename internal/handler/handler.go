@@ -13,25 +13,28 @@ type Handler interface {
 	UserRole() UserRoleHandler
 	Auth() AuthHandler
 	Task() TaskHandler
+	DeadLetter() DeadLetterHandler
 }
 
 type HandlerImpl struct {
-	logger          *zap.Logger
-	helloHandler    HelloHandler
-	userHandler     UserHandler
-	userRoleHandler UserRoleHandler
-	authHandler     AuthHandler
-	taskHandler     TaskHandler
+	logger            *zap.Logger
+	helloHandler      HelloHandler
+	userHandler       UserHandler
+	userRoleHandler   UserRoleHandler
+	authHandler       AuthHandler
+	taskHandler       TaskHandler
+	deadLetterHandler DeadLetterHandler
 }
 
 func NewHandler(service service.Service, taskqClient *taskq.Client, logger *zap.Logger) Handler {
 	return &HandlerImpl{
-		logger:          logger,
-		helloHandler:    NewHelloHandler(logger),
-		userHandler:     NewUserHandler(logger, service),
-		userRoleHandler: NewUserRoleHandler(logger, service),
-		authHandler:     NewAuthHandler(logger, service),
-		taskHandler:     NewTaskHandler(logger, taskqClient),
+		logger:            logger,
+		helloHandler:      NewHelloHandler(logger),
+		userHandler:       NewUserHandler(logger, service),
+		userRoleHandler:   NewUserRoleHandler(logger, service),
+		authHandler:       NewAuthHandler(logger, service),
+		taskHandler:       NewTaskHandler(logger, taskqClient),
+		deadLetterHandler: NewDeadLetterHandler(logger, service),
 	}
 }
 
@@ -53,4 +56,8 @@ func (h *HandlerImpl) Auth() AuthHandler {
 
 func (h *HandlerImpl) Task() TaskHandler {
 	return h.taskHandler
+}
+
+func (h *HandlerImpl) DeadLetter() DeadLetterHandler {
+	return h.deadLetterHandler
 }
