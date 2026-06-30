@@ -210,19 +210,30 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
 | GET | `/api/hello` | Health check | No |
+| GET | `/api/healthz` | Liveness + readiness probe | No |
 | POST | `/api/auth/send-sms-code` | Send SMS verification code | No |
 | POST | `/api/auth/send-email-code` | Send email verification code | No |
 | POST | `/api/auth/login/mobile` | Login via mobile + code | No |
 | POST | `/api/auth/login/email` | Login via email + code | No |
-| GET | `/api/user/info` | Get current user info | Yes |
-| PUT | `/api/user/info` | Update user info | Yes |
-| GET | `/api/user/admin/table` | Get users list (paginated) | admin+ |
-| GET | `/api/role/table` | List roles (paginated) | admin+ |
+| GET | `/api/user/my-info` | Get current user info | Yes |
+| PUT | `/api/user/my-info` | Update current user info | Yes |
+| GET | `/api/user/admin/table` | List users (paginated) | admin+ |
+| GET | `/api/user/admin/{id}` | Get user by ID | admin+ |
+| POST | `/api/user/admin` | Create user | admin+ |
+| PUT | `/api/user/admin/{id}` | Update user | admin+ |
+| DELETE | `/api/user/admin/{id}` | Delete user (soft) | admin+ |
 | GET | `/api/role/{id}` | Get role by ID | admin+ |
+| GET | `/api/role/table` | List roles (paginated) | admin+ |
 | POST | `/api/role` | Create role | admin+ |
 | PUT | `/api/role/{id}` | Update role | admin+ |
 | DELETE | `/api/role/{id}` | Delete role (soft) | admin+ |
-| GET | `/api/admin/dead-letters` | List dead letters | super_admin |
+| GET | `/api/admin/tenants/code` | Generate tenant code | super_admin |
+| GET | `/api/admin/tenants/{id}` | Get tenant by ID | super_admin |
+| GET | `/api/admin/tenants` | List tenants (paginated) | super_admin |
+| POST | `/api/admin/tenants` | Create tenant | super_admin |
+| PUT | `/api/admin/tenants/{id}` | Update tenant | super_admin |
+| DELETE | `/api/admin/tenants/{id}` | Delete tenant (soft) | super_admin |
+| GET | `/api/admin/dead-letters` | List dead letters (DB) | super_admin |
 | POST | `/api/admin/dead-letters/retry` | Retry one dead letter | super_admin |
 | POST | `/api/admin/dead-letters/retry-all` | Retry all by type | super_admin |
 | DELETE | `/api/admin/dead-letters` | Delete dead letter | super_admin |

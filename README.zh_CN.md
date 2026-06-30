@@ -210,17 +210,30 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | 方法 | 接口 | 描述 | 需要认证 |
 |------|------|------|----------|
 | GET | `/api/hello` | 健康检查 | 否 |
+| GET | `/api/healthz` | 存活 + 就绪探测 | 否 |
+| POST | `/api/auth/send-sms-code` | 发送短信验证码 | 否 |
+| POST | `/api/auth/send-email-code` | 发送邮箱验证码 | 否 |
 | POST | `/api/auth/login/mobile` | 手机号 + 验证码登录 | 否 |
 | POST | `/api/auth/login/email` | 邮箱 + 验证码登录 | 否 |
-| GET | `/api/user/info` | 获取当前用户信息 | 是 |
-| PUT | `/api/user/info` | 更新用户信息 | 是 |
-| GET | `/api/user/admin/table` | 获取用户列表（分页） | admin+ |
+| GET | `/api/user/my-info` | 获取当前用户信息 | 是 |
+| PUT | `/api/user/my-info` | 更新当前用户信息 | 是 |
+| GET | `/api/user/admin/table` | 用户列表（分页） | admin+ |
+| GET | `/api/user/admin/{id}` | 查询用户 | admin+ |
+| POST | `/api/user/admin` | 创建用户 | admin+ |
+| PUT | `/api/user/admin/{id}` | 更新用户 | admin+ |
+| DELETE | `/api/user/admin/{id}` | 删除用户（软） | admin+ |
+| GET | `/api/role/{id}` | 查询角色 | admin+ |
 | GET | `/api/role/table` | 角色列表（分页） | admin+ |
-| GET | `/api/role/{id}` | 查询角色详情 | admin+ |
 | POST | `/api/role` | 创建角色 | admin+ |
 | PUT | `/api/role/{id}` | 更新角色 | admin+ |
-| DELETE | `/api/role/{id}` | 删除角色（软删除） | admin+ |
-| GET | `/api/admin/dead-letters` | 死信列表 | super_admin |
+| DELETE | `/api/role/{id}` | 删除角色（软） | admin+ |
+| GET | `/api/admin/tenants/code` | 生成租户 Code | super_admin |
+| GET | `/api/admin/tenants/{id}` | 查询租户 | super_admin |
+| GET | `/api/admin/tenants` | 租户列表（分页） | super_admin |
+| POST | `/api/admin/tenants` | 创建租户 | super_admin |
+| PUT | `/api/admin/tenants/{id}` | 更新租户 | super_admin |
+| DELETE | `/api/admin/tenants/{id}` | 删除租户（软） | super_admin |
+| GET | `/api/admin/dead-letters` | 死信列表（DB） | super_admin |
 | POST | `/api/admin/dead-letters/retry` | 重试单条死信 | super_admin |
 | POST | `/api/admin/dead-letters/retry-all` | 按类型批量重试 | super_admin |
 | DELETE | `/api/admin/dead-letters` | 删除死信 | super_admin |
