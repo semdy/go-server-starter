@@ -423,11 +423,50 @@ a.cronSched.Stop()  // waits for running jobs to finish
 
 ## 🛠️ Development
 
-### Generate Code
+### Scaffold a Module
+
+Generate a full CRUD module (model + repo + dto + service + handler + route + migration) in one command:
 
 ```bash
-./generate.sh
+./generate.sh product
 ```
+
+Output:
+
+```
+internal/model/product.go                      # data struct
+internal/repo/product_repo.go                  # BaseRepo wrapper
+internal/dto/product_dto.go                    # request/response types
+internal/service/product_service.go            # business logic
+internal/handler/product_handler.go            # HTTP binding
+internal/router/product_router.go              # routes + permissions
+internal/database/migration/migrations/xxx.sql # goose migration
+```
+
+The script also prints the exact lines you need to paste into `repo.go`, `service.go`, `handler.go`, and `router.go` to register the new module (3 files, ~4 lines each).
+
+### What gets touched
+
+Adding a full CRUD module touches 12 files:
+
+| # | File | Purpose | Auto? |
+|---|------|---------|:--:|
+| 1 | `internal/model/xxx.go` | Data struct | ✅ generated |
+| 2 | `internal/database/migration/migrations/xxx.sql` | DDL | ✅ generated |
+| 3 | `internal/repo/xxx_repo.go` | BaseRepo wrapper (10 lines) | ✅ generated |
+| 4 | `internal/repo/repo.go` | Register repo to aggregate | ✏️ 1 line each |
+| 5 | `internal/dto/xxx_dto.go` | Request/response types | ✅ generated |
+| 6 | `internal/service/xxx_service.go` | Business logic (~100 lines) | ✅ generated |
+| 7 | `internal/service/service.go` | Register service to aggregate | ✏️ 1 line each |
+| 8 | `internal/handler/xxx_handler.go` | HTTP binding (~80 lines) | ✅ generated |
+| 9 | `internal/handler/handler.go` | Register handler to aggregate | ✏️ 1 line each |
+| 10 | `internal/router/xxx_router.go` | Routes + permissions (10 lines) | ✅ generated |
+| 11 | `internal/router/router.go` | Register routes | ✏️ 1 line |
+| 12 | (none) | goose auto-runs on restart | ✅ automatic |
+
+Files marked ✅ are fully scaffolded by `generate.sh`. Files marked ✏️ need one insertion each — the script prints the exact code to paste.
+
+To delete a module: `./generate.sh -d product`.
 
 ### Hot Reload
 

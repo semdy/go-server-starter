@@ -421,11 +421,50 @@ a.cronSched.Stop()  // 等待正在执行的任务完成
 
 ## 🛠️ 开发指南
 
-### 代码生成
+### 模块脚手架
+
+一键生成完整 CRUD 模块（model + repo + dto + service + handler + route + migration）：
 
 ```bash
-./generate.sh
+./generate.sh product
 ```
+
+生成产物：
+
+```
+internal/model/product.go                      # 数据结构
+internal/repo/product_repo.go                  # BaseRepo 封装
+internal/dto/product_dto.go                    # 请求/响应类型
+internal/service/product_service.go            # 业务逻辑
+internal/handler/product_handler.go            # HTTP 绑定
+internal/router/product_router.go              # 路由 + 权限
+internal/database/migration/migrations/xxx.sql # goose 迁移
+```
+
+脚本还会打印注册到 `repo.go`、`service.go`、`handler.go`、`router.go` 的具体代码行（3 个文件，各 ~4 行）。
+
+### 涉及的文件
+
+新增一个 CRUD 模块需要接触 12 个文件：
+
+| # | 文件 | 用途 | 自动? |
+|---|------|------|:--:|
+| 1 | `internal/model/xxx.go` | 数据结构 | ✅ 生成 |
+| 2 | `internal/database/migration/migrations/xxx.sql` | DDL | ✅ 生成 |
+| 3 | `internal/repo/xxx_repo.go` | BaseRepo 封装（10 行） | ✅ 生成 |
+| 4 | `internal/repo/repo.go` | 注册到聚合入口 | ✏️ 各 1 行 |
+| 5 | `internal/dto/xxx_dto.go` | 请求/响应类型 | ✅ 生成 |
+| 6 | `internal/service/xxx_service.go` | 业务逻辑（~100 行） | ✅ 生成 |
+| 7 | `internal/service/service.go` | 注册到聚合入口 | ✏️ 各 1 行 |
+| 8 | `internal/handler/xxx_handler.go` | HTTP 绑定（~80 行） | ✅ 生成 |
+| 9 | `internal/handler/handler.go` | 注册到聚合入口 | ✏️ 各 1 行 |
+| 10 | `internal/router/xxx_router.go` | 路由 + 权限（10 行） | ✅ 生成 |
+| 11 | `internal/router/router.go` | 注册路由 | ✏️ 1 行 |
+| 12 | （无） | goose 启动时自动执行 | ✅ 自动 |
+
+✅ = `generate.sh` 自动生成完整内容。✏️ = 需手动粘贴一行——脚本会打印确切代码。
+
+删除模块：`./generate.sh -d product`。
 
 ### 热重载
 
