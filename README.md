@@ -369,6 +369,38 @@ a.taskqClient.Close()     // close Redis connection
 
 Tasks are archived by Asynq after retries are exhausted and can be inspected via `asynqmon`.
 
+## ⏰ Cron Scheduler
+
+[robfig/cron](https://github.com/robfig/cron) schedules recurring jobs in-process. All jobs are registered in `pkg/cronjob/register.go` via `cronjob.Register(repo, logger)`. `app.go` only calls `Start()`/`Stop()`.
+
+### Adding a job
+
+Add a `Job` entry in `pkg/cronjob/register.go`:
+
+```go
+jobs := []Job{
+    {Name: "my-job", Spec: "@every 1h", Fn: myJob(log)},
+    // ...
+}
+```
+
+Then implement `myJob` in the same file. No changes to `app.go`.
+
+Supports 6-field cron (`sec min hour dom month dow`) and interval format (`@every 1h30m`).
+
+### Built-in jobs
+
+| Job | Schedule | Action |
+|-----|----------|--------|
+| `heartbeat` | `@every 1h` | Log a heartbeat |
+| `purge-dead-letters` | `0 0 3 * * *` (3am daily) | Hard-delete retried dead letters older than 30 days |
+
+### Graceful shutdown
+
+```go
+a.cronSched.Stop()  // waits for running jobs to finish
+```
+
 ## 🛠️ Development
 
 ### Generate Code

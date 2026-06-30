@@ -367,6 +367,38 @@ a.taskqClient.Close()     // 关闭 Redis 连接
 
 重试耗尽后任务被 Asynq 归档，可通过 `asynqmon` 查看。
 
+## ⏰ 定时任务
+
+[robfig/cron](https://github.com/robfig/cron) 提供进程内 cron 调度。所有任务在 `pkg/cronjob/register.go` 中通过 `cronjob.Register(repo, logger)` 集中注册，`app.go` 只负责 `Start()`/`Stop()`。
+
+### 添加任务
+
+在 `pkg/cronjob/register.go` 的 `jobs` 列表中添加一项，同文件实现任务函数：
+
+```go
+jobs := []Job{
+    {Name: "my-job", Spec: "@every 1h", Fn: myJob(log)},
+    // ...
+}
+```
+
+无需改动 `app.go`。
+
+支持 6 字段 cron（`秒 分 时 日 月 周`）和间隔格式（`@every 1h30m`）。
+
+### 内置任务
+
+| 任务 | 调度 | 操作 |
+|------|------|------|
+| `heartbeat` | `@every 1h` | 记录心跳日志 |
+| `purge-dead-letters` | `0 0 3 * * *`（每天 3 点） | 物理删除 30 天前已重试的死信 |
+
+### 优雅关闭
+
+```go
+a.cronSched.Stop()  // 等待正在执行的任务完成
+```
+
 ## 🛠️ 开发指南
 
 ### 代码生成

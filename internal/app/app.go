@@ -13,6 +13,7 @@ import (
 	"go-server-starter/internal/seed"
 	"go-server-starter/internal/service"
 	"go-server-starter/pkg/auth"
+	"go-server-starter/pkg/cronjob"
 	"go-server-starter/pkg/database"
 	"go-server-starter/pkg/jwt"
 	"go-server-starter/pkg/logger"
@@ -47,6 +48,7 @@ type App struct {
 	seed        seed.Seed
 	taskqClient *taskq.Client
 	taskqServer *taskq.Server
+	cronSched   *cronjob.Scheduler
 }
 
 func NewApp(config *config.Config, logger *zap.Logger) *App {
@@ -242,6 +244,10 @@ func (a *App) Start() error {
 	)
 	router.SetupRoutes()
 
+	// 初始化定时任务
+	a.cronSched = cronjob.Register(a.repo, a.logger)
+	a.cronSched.Start()
+
 	go func() {
 		a.logger.Info(fmt.Sprintf("Server starting on port %d...", serverConfig.Port))
 		if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -287,6 +293,10 @@ func (a *App) Shutdown() error {
 		if err := a.taskqClient.Close(); err != nil {
 			a.logger.Error("Failed to close taskq client", zap.Error(err))
 		}
+	}
+
+	if a.cronSched != nil {
+		a.cronSched.Stop()
 	}
 
 	a.logger.Info("Server shutdown successfully")
