@@ -165,6 +165,26 @@ The project uses JWT for stateless authentication with device-specific token exp
 - **Chrome Extension**: 30 days
 - **API**: 48 hours
 
+#### Token Auto-Refresh
+
+When a token's remaining lifetime drops below 1/3 of its total TTL, the server issues a new token in the `new-token` response header. The client should capture it and replace the old token:
+
+```javascript
+// axios
+axios.interceptors.response.use(res => {
+  const newToken = res.headers['new-token']
+  if (newToken) localStorage.setItem('token', newToken)
+  return res
+})
+
+// fetch
+const res = await fetch('/api/user/my-info', { headers })
+const newToken = res.headers.get('new-token')
+if (newToken) localStorage.setItem('token', newToken)
+```
+
+The old token remains valid until expiry — no requests are rejected during the overlap window.
+
 ### Role-Based Access Control
 
 Built-in roles:

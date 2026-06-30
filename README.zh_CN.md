@@ -165,6 +165,26 @@ redis:
 - **Chrome 扩展**: 30 天
 - **API**: 48 小时
 
+#### Token 自动续期
+
+当 token 剩余有效期不足总 TTL 的 1/3 时，服务端在 `new-token` 响应头中返回新 token。客户端应捕获并替换旧 token：
+
+```javascript
+// axios
+axios.interceptors.response.use(res => {
+  const newToken = res.headers['new-token']
+  if (newToken) localStorage.setItem('token', newToken)
+  return res
+})
+
+// fetch
+const res = await fetch('/api/user/my-info', { headers })
+const newToken = res.headers.get('new-token')
+if (newToken) localStorage.setItem('token', newToken)
+```
+
+旧 token 在过期前仍然有效——重叠窗口内不会有请求被拒绝。
+
 ### 基于角色的访问控制
 
 内置角色：
