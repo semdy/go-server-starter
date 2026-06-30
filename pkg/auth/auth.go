@@ -21,6 +21,9 @@ type Auth interface {
 	RoleCheck(roleCheckType RoleCheckType, roles ...enum.RoleCode) gin.HandlerFunc
 	RoleCheckAny(roles ...enum.RoleCode) gin.HandlerFunc
 	RoleCheckAll(roles ...enum.RoleCode) gin.HandlerFunc
+	// String variants accept dynamic role names (e.g. tenant-specific roles).
+	RoleCheckAnyS(roles ...string) gin.HandlerFunc
+	RoleCheckAllS(roles ...string) gin.HandlerFunc
 }
 
 type AuthImpl struct {
@@ -92,4 +95,20 @@ func (a *AuthImpl) RoleCheckAny(roles ...enum.RoleCode) gin.HandlerFunc {
 
 func (a *AuthImpl) RoleCheckAll(roles ...enum.RoleCode) gin.HandlerFunc {
 	return a.RoleCheck(RoleCheckTypeAll, roles...)
+}
+
+func (a *AuthImpl) RoleCheckAnyS(roles ...string) gin.HandlerFunc {
+	enumRoles := make([]enum.RoleCode, len(roles))
+	for i, r := range roles {
+		enumRoles[i] = enum.RoleCode(r)
+	}
+	return a.RoleCheck(RoleCheckTypeAny, enumRoles...)
+}
+
+func (a *AuthImpl) RoleCheckAllS(roles ...string) gin.HandlerFunc {
+	enumRoles := make([]enum.RoleCode, len(roles))
+	for i, r := range roles {
+		enumRoles[i] = enum.RoleCode(r)
+	}
+	return a.RoleCheck(RoleCheckTypeAll, enumRoles...)
 }

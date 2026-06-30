@@ -72,28 +72,30 @@ func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, u
 		return roles, nil
 	}
 
-	// Cache miss (goredis.Nil) or Redis unavailable — fall through to DB
 	if !errors.Is(err, goredis.Nil) {
-		// Redis is unavailable — fall back to DB directly instead of returning 500
 		s.logger.Warn("redis unavailable, falling back to DB",
 			zap.String("uniCode", uniCode), zap.Error(err))
-		return s.GetRolesCodeByUniCode(ctx, uniCode)
+		// Fall through to singleflight — don't bypass it
 	}
 
-	// Cache miss — use singleflight to deduplicate concurrent requests
-	// Only one goroutine per uniCode queries DB and populates cache
+	// Cache miss or Redis unavailable — use singleflight to deduplicate concurrent DB queries
 	result, sfErr, _ := s.sfGroup.Do(cacheKey, func() (any, error) {
 		roles, exc := s.GetRolesCodeByUniCode(ctx, uniCode)
 		if exc != nil {
 			return nil, exc // *exception.Exception implements error
 		}
 
-		// Populate cache (best-effort, don't fail on cache write error)
-		if rolesJSON, err := json.Marshal(roles); err == nil {
-			if setErr := s.redis.Set(ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
-				s.logger.Warn("failed to set role cache", zap.String("uniCode", uniCode), zap.Error(setErr))
-			}
+		rolesJSON, err := json.Marshal(roles)
+		if err != nil {
+			s.logger.Error("failed to marshal roles for cache", zap.String("uniCode", uniCode), zap.Error(err))
+			return nil, err
 		}
+
+		if setErr := s.redis.Set(ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
+			s.logger.Warn("failed to set role cache", zap.String("uniCode", uniCode), zap.Error(setErr))
+			return nil, err
+		}
+
 		return roles, nil
 	})
 

@@ -9,7 +9,6 @@ import (
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/jwt"
-	"go-server-starter/pkg/snowflake"
 	"go-server-starter/pkg/taskq"
 	"strings"
 	"time"
@@ -24,26 +23,19 @@ type AuthService interface {
 }
 
 type AuthServiceImpl struct {
-	repo      repo.Repo
-	jwt       *jwt.JWT
-	taskq     *taskq.Client
-	snowflake *snowflake.Snowflake
-	logger    *zap.Logger
+	repo   repo.Repo
+	jwt    *jwt.JWT
+	taskq  *taskq.Client
+	logger *zap.Logger
 }
 
-func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, sf *snowflake.Snowflake, logger *zap.Logger) AuthService {
+func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, logger *zap.Logger) AuthService {
 	return &AuthServiceImpl{
-		repo:      repo,
-		jwt:       jwt,
-		taskq:     taskq,
-		snowflake: sf,
-		logger:    logger,
+		repo:   repo,
+		jwt:    jwt,
+		taskq:  taskq,
+		logger: logger,
 	}
-}
-
-// generateTenantID generates a unique tenant ID using snowflake.
-func (s *AuthServiceImpl) generateTenantID() string {
-	return "t-" + s.snowflake.GenerateStringID()
 }
 
 // loginOrRegister looks up a user, returns their tenant_id from DB, or auto-generates one for new users.
@@ -87,7 +79,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		}
 
 		user = newUser(uniCode)
-		user.TenantID = s.generateTenantID()
+		user.TenantID = "default"
 		user.Roles = []model.UserRole{*role}
 
 		if err := userRepo.Create(ctx, user); err != nil {
@@ -153,9 +145,3 @@ func (s *AuthServiceImpl) LoginByEmailAndCode(ctx context.Context, deviceType en
 	)
 }
 
-func verifyCode(code string, invalidErr *exception.Exception) *exception.Exception {
-	if code == "" {
-		return invalidErr
-	}
-	return nil
-}

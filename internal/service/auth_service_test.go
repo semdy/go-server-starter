@@ -52,7 +52,6 @@ func TestNewAuthService(t *testing.T) {
 		&mockRepo{userRepo: &stubUserRepo{}, userRoleRepo: &stubUserRoleRepo{}},
 		testJWT(),
 		nil,   // taskq
-		nil,   // snowflake
 		zap.NewNop(),
 	)
 	if svc == nil {

@@ -1,6 +1,5 @@
 package dto
 
-// 更新用户信息请求DTO
 type UserUpdateInfoReqDto struct {
 	Nickname  *string `json:"nickname" form:"nickname" binding:"required,min=2,max=20"`
 	AvatarURL *string `json:"avatarURL" form:"avatarURL" binding:"omitempty,url"`
@@ -37,4 +36,10 @@ type UserListItemResDto struct {
 	Nickname    string   `json:"nickname"`
 	AvatarURL   string   `json:"avatarURL"`
 	Roles       []string `json:"roles"`
+}
+
+// CreateUserReqDto is the request DTO for admin user creation.
+type CreateUserReqDto struct {
+	Email    string `json:"email" binding:"required,email"`
+	Nickname string `json:"nickname" binding:"required,min=2,max=20"`
 }

@@ -20,8 +20,12 @@ type UserService interface {
 	GetByID(ctx context.Context, id uint64) (*model.User, *exception.Exception)
 	GetByUniCode(ctx context.Context, uniCode string) (*model.User, *exception.Exception)
 	GetInfoByUniCode(ctx context.Context, uniCode string) (*dto.UserInfoResDto, *exception.Exception)
+	UpdateMyInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception)
 	GetTable(ctx context.Context, params dto.UserTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserListItemResDto], *exception.Exception)
-	UpdateInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception)
+	GetInfoByID(ctx context.Context, id uint64) (*dto.UserInfoResDto, *exception.Exception)
+	UserCreate(ctx context.Context, params dto.CreateUserReqDto) (*dto.UserInfoResDto, *exception.Exception)
+	UserUpdate(ctx context.Context, id uint64, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception)
+	UserDelete(ctx context.Context, id uint64) *exception.Exception
 }
 
 type UserServiceImpl struct {
@@ -72,22 +76,7 @@ func (s *UserServiceImpl) GetInfoByUniCode(ctx context.Context, uniCode string) 
 	if err != nil {
 		return nil, err
 	}
-
-	roles := make([]string, len(user.Roles))
-	for i, role := range user.Roles {
-		roles[i] = role.Code.String()
-	}
-
-	return &dto.UserInfoResDto{
-		UniCode:     user.UniCode,
-		Email:       user.Email,
-		Mobile:      user.Mobile,
-		CountryCode: user.CountryCode,
-		Desc:        user.Desc,
-		Nickname:    user.Nickname,
-		AvatarURL:   user.AvatarURL,
-		Roles:       roles,
-	}, nil
+	return userToInfoDto(user), nil
 }
 
 func (s *UserServiceImpl) GetTable(ctx context.Context, params dto.UserTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserListItemResDto], *exception.Exception) {
@@ -126,7 +115,15 @@ func (s *UserServiceImpl) GetTable(ctx context.Context, params dto.UserTableQuer
 	return utils.AssemblePaginationResDto(res, total, params.Page, params.PageSize), nil
 }
 
-func (s *UserServiceImpl) UpdateInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
+func (s *UserServiceImpl) GetInfoByID(ctx context.Context, id uint64) (*dto.UserInfoResDto, *exception.Exception) {
+	user, err := s.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return userToInfoDto(user), nil
+}
+
+func (s *UserServiceImpl) UpdateMyInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
 	user, err := s.repo.User().GetOne(ctx, repo.Where("uni_code = ?", uniCode), repo.Preload("Roles"), tenantFilter(ctx))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
@@ -147,6 +144,10 @@ func (s *UserServiceImpl) UpdateInfo(ctx context.Context, uniCode string, params
 	if err := s.repo.User().UpdateByZeroFields(ctx, user.ID, user); err != nil {
 		return nil, exception.UserUpdateInfoFailed.Append(err.Error())
 	}
+	return userToInfoDto(user), nil
+}
+
+func userToInfoDto(user *model.User) *dto.UserInfoResDto {
 	roles := make([]string, len(user.Roles))
 	for i, role := range user.Roles {
 		roles[i] = role.Code.String()
@@ -160,5 +161,62 @@ func (s *UserServiceImpl) UpdateInfo(ctx context.Context, uniCode string, params
 		Nickname:    user.Nickname,
 		AvatarURL:   user.AvatarURL,
 		Roles:       roles,
-	}, nil
+	}
+}
+
+func (s *UserServiceImpl) UserCreate(ctx context.Context, params dto.CreateUserReqDto) (*dto.UserInfoResDto, *exception.Exception) {
+	tid := cctx.GetTenantID(ctx)
+	if tid == "" {
+		tid = "default"
+	}
+	existing, err := s.repo.User().GetOne(ctx, repo.Where("email = ? AND tenant_id = ?", params.Email, tid))
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	if existing != nil {
+		return nil, exception.BadRequest.Append("email already exists in this tenant")
+	}
+	uniCode, _ := s.repo.User().GenerateUniCode(ctx)
+	user := &model.User{TenantID: tid, UniCode: uniCode, Email: params.Email, Nickname: params.Nickname}
+	if err := s.repo.User().Create(ctx, user); err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	return userToInfoDto(user), nil
+}
+
+func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
+	tid := cctx.GetTenantID(ctx)
+	if tid == "" {
+		tid = "default"
+	}
+	user, err := s.repo.User().GetByID(ctx, id, repo.Preload("Roles"))
+	if err != nil || user == nil || user.TenantID != tid {
+		return nil, exception.UserNotFound
+	}
+	if params.Nickname != nil {
+		user.Nickname = *params.Nickname
+	}
+	if params.AvatarURL != nil {
+		user.AvatarURL = *params.AvatarURL
+	}
+	if params.Desc != nil {
+		user.Desc = *params.Desc
+	}
+	if err := s.repo.User().UpdateByZeroFields(ctx, id, user); err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	return userToInfoDto(user), nil
+}
+
+func (s *UserServiceImpl) UserDelete(ctx context.Context, id uint64) *exception.Exception {
+	tid := cctx.GetTenantID(ctx)
+	if tid == "" {
+		tid = "default"
+	}
+	user, err := s.repo.User().GetOne(ctx, repo.Where("id = ? AND tenant_id = ?", id, tid))
+	if err != nil || user == nil {
+		return nil
+	}
+	_ = s.repo.User().SoftDelete(ctx, id)
+	return nil
 }

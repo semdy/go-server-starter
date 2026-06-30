@@ -26,6 +26,26 @@ func (s *seed) Run() error {
 	if err := s.SeedUserRole(); err != nil {
 		return err
 	}
+	if err := s.SeedDefaultTenant(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *seed) SeedDefaultTenant() error {
+	ctx := context.Background()
+	existing, err := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", "default"))
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return nil
+	}
+	t := &model.Tenant{Name: "Default", Code: "default", Status: "active"}
+	if err := s.repo.Tenant().Create(ctx, t); err != nil {
+		return err
+	}
+	s.logger.Info("seeded default tenant")
 	return nil
 }
 

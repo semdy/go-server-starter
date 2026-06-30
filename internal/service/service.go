@@ -46,7 +46,7 @@ func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.C
 		logger:            logger,
 		userService:       NewUserService(repo, redis, logger),
 		userRoleService:   NewUserRoleService(repo, redis, logger),
-		authService:       NewAuthService(repo, jwt, taskqClient, snowflake, logger),
+		authService:       NewAuthService(repo, jwt, taskqClient, logger),
 		verifyCodeService: NewVerifyCodeService(redis.Client, taskqClient, logger),
 		deadLetterService: NewDeadLetterService(repo, taskqClient, logger),
 		tenantService:     NewTenantService(repo, snowflake, logger),
