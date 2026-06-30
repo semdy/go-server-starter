@@ -18,6 +18,7 @@ const (
 	CTX_KEY_OF_LOCALE        = "ctx:locale"
 	CTX_KEY_OF_TRANSLATOR    = "ctx:translator"
 	CTX_KEY_OF_USER_UNI_CODE = "ctx:user_uni_code"
+	CTX_KEY_OF_TENANT_ID      = "ctx:tenant_id"
 )
 
 func RedisKeyOfRateLimit(zone string, ip string) string {

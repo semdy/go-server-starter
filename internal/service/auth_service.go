@@ -9,6 +9,7 @@ import (
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/jwt"
+	"go-server-starter/pkg/snowflake"
 	"go-server-starter/pkg/taskq"
 	"strings"
 	"time"
@@ -23,23 +24,29 @@ type AuthService interface {
 }
 
 type AuthServiceImpl struct {
-	repo   repo.Repo
-	jwt    *jwt.JWT
-	taskq  *taskq.Client
-	logger *zap.Logger
+	repo      repo.Repo
+	jwt       *jwt.JWT
+	taskq     *taskq.Client
+	snowflake *snowflake.Snowflake
+	logger    *zap.Logger
 }
 
-func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, logger *zap.Logger) AuthService {
+func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, sf *snowflake.Snowflake, logger *zap.Logger) AuthService {
 	return &AuthServiceImpl{
-		repo:   repo,
-		jwt:    jwt,
-		taskq:  taskq,
-		logger: logger,
+		repo:      repo,
+		jwt:       jwt,
+		taskq:     taskq,
+		snowflake: sf,
+		logger:    logger,
 	}
 }
 
-// loginOrRegister is a shared helper that looks up a user by a query condition,
-// and if not found, creates a new user with the given fields and binds the "user" role.
+// generateTenantID generates a unique tenant ID using snowflake.
+func (s *AuthServiceImpl) generateTenantID() string {
+	return "t-" + s.snowflake.GenerateStringID()
+}
+
+// loginOrRegister looks up a user, returns their tenant_id from DB, or auto-generates one for new users.
 func (s *AuthServiceImpl) loginOrRegister(
 	ctx context.Context,
 	deviceType enum.DeviceType,
@@ -80,6 +87,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		}
 
 		user = newUser(uniCode)
+		user.TenantID = s.generateTenantID()
 		user.Roles = []model.UserRole{*role}
 
 		if err := userRepo.Create(ctx, user); err != nil {
@@ -106,7 +114,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		}
 	}
 
-	token, err := s.jwt.GenerateToken(user.UniCode, deviceType)
+	token, err := s.jwt.GenerateToken(user.UniCode, user.TenantID, deviceType)
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -115,11 +123,6 @@ func (s *AuthServiceImpl) loginOrRegister(
 }
 
 func (s *AuthServiceImpl) LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
-	// TODO: Implement real SMS verification code validation
-	if err := verifyCode(params.Code, exception.UserMobileVerificationCodeIsIncorrect); err != nil {
-		return nil, err
-	}
-
 	params.Mobile = strings.ReplaceAll(params.Mobile, " ", "")
 
 	return s.loginOrRegister(ctx, deviceType,
@@ -136,11 +139,6 @@ func (s *AuthServiceImpl) LoginByMobileAndCode(ctx context.Context, deviceType e
 }
 
 func (s *AuthServiceImpl) LoginByEmailAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
-	// TODO: Implement real email verification code validation
-	if err := verifyCode(params.Code, exception.UserEmailVerificationCodeIsIncorrect); err != nil {
-		return nil, err
-	}
-
 	params.Email = strings.ToLower(strings.TrimSpace(params.Email))
 
 	return s.loginOrRegister(ctx, deviceType,
@@ -155,12 +153,9 @@ func (s *AuthServiceImpl) LoginByEmailAndCode(ctx context.Context, deviceType en
 	)
 }
 
-// verifyCode validates a verification code is not empty, returning the given exception if invalid.
-// TODO: Replace with real SMS/email verification service.
 func verifyCode(code string, invalidErr *exception.Exception) *exception.Exception {
 	if code == "" {
 		return invalidErr
 	}
-	// TODO: Call external verification service to validate the code
 	return nil
 }

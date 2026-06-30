@@ -14,6 +14,7 @@ type Repo interface {
 	User() UserRepo
 	UserRole() UserRoleRepo
 	DeadLetter() DeadLetterRepo
+	Tenant() TenantRepo
 }
 
 type RepoImpl struct {
@@ -22,6 +23,7 @@ type RepoImpl struct {
 	userRepo        UserRepo
 	userRoleRepo    UserRoleRepo
 	deadLetterRepo  DeadLetterRepo
+	tenantRepo      TenantRepo
 }
 
 func NewRepo(db *gorm.DB, logger *zap.Logger) Repo {
@@ -31,6 +33,7 @@ func NewRepo(db *gorm.DB, logger *zap.Logger) Repo {
 		userRepo:       NewUserRepo(db, logger),
 		userRoleRepo:   NewUserRoleRepo(db, logger),
 		deadLetterRepo: NewDeadLetterRepo(db, logger),
+		tenantRepo:     NewTenantRepo(db, logger),
 	}
 }
 
@@ -56,4 +59,8 @@ func (r *RepoImpl) UserRole() UserRoleRepo {
 
 func (r *RepoImpl) DeadLetter() DeadLetterRepo {
 	return r.deadLetterRepo
+}
+
+func (r *RepoImpl) Tenant() TenantRepo {
+	return r.tenantRepo
 }

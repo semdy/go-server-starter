@@ -56,6 +56,7 @@ func (r *testRepo) Transaction(_ context.Context, _ func(tx *gorm.DB) error) err
 func (r *testRepo) User() repo.UserRepo                      { return r.userRepo }
 func (r *testRepo) UserRole() repo.UserRoleRepo              { return r.userRoleRepo }
 func (r *testRepo) DeadLetter() repo.DeadLetterRepo          { return nil }
+func (r *testRepo) Tenant() repo.TenantRepo                   { return nil }
 
 func sampleUser() *model.User {
 	return &model.User{

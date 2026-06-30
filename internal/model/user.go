@@ -2,6 +2,7 @@ package model
 
 type User struct {
 	Model
+	TenantID    string     `json:"tenantId"`
 	UniCode     string     `json:"uniCode"`
 	Email       string     `json:"email"`
 	Mobile      string     `json:"mobile"`

@@ -4,6 +4,7 @@ import (
 	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/service"
+	"go-server-starter/pkg/verify_code"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -33,6 +34,7 @@ func NewAuthHandler(logger *zap.Logger, service service.Service) AuthHandler {
 // @Produce      json
 // @Param        body  body      dto.AuthLoginByMobileAndCodeReqDto  true  "登录参数"
 // @Param        Device-Type  header    string  false  "设备类型: web/desktop/mobile/chromeExtension/api"
+// @Param        X-Tenant-ID  header    string  false  "租户 ID (默认 default)"
 // @Success      200   {object}  dto.AuthTokenResDto
 // @Failure      400   {object}  map[string]interface{}
 // @Router       /auth/login/mobile [post]
@@ -44,6 +46,11 @@ func (h *AuthHandlerImpl) LoginByMobileAndCode(c *gin.Context) {
 		return
 	}
 	deviceType := appCtx.GetDeviceType()
+	// Validate verification code
+	if err := h.service.VerifyCode().Validate(verify_code.SMSTypeLogin, params.Mobile, params.Code); err != nil {
+		appCtx.ToError(err)
+		return
+	}
 	res, err := h.service.Auth().LoginByMobileAndCode(appCtx.Ctx, deviceType, params)
 	if err != nil {
 		appCtx.ToError(err)
@@ -71,6 +78,11 @@ func (h *AuthHandlerImpl) LoginByEmailAndCode(c *gin.Context) {
 		return
 	}
 	deviceType := appCtx.GetDeviceType()
+	// Validate verification code
+	if err := h.service.VerifyCode().Validate(verify_code.EmailTypeLogin, params.Email, params.Code); err != nil {
+		appCtx.ToError(err)
+		return
+	}
 	res, err := h.service.Auth().LoginByEmailAndCode(appCtx.Ctx, deviceType, params)
 	if err != nil {
 		appCtx.ToError(err)

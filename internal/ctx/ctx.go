@@ -77,6 +77,18 @@ func (c *Context) SetUserUniCode(code string) {
 	c.Gtx.Set(constant.CTX_KEY_OF_USER_UNI_CODE, code)
 }
 
+func (c *Context) GetTenantID() (string, *exception.Exception) {
+	tid := c.Gtx.GetString(constant.CTX_KEY_OF_TENANT_ID)
+	if tid == "" {
+		return "", exception.Forbidden.Append("tenant not found")
+	}
+	return tid, nil
+}
+
+func (c *Context) SetTenantID(tid string) {
+	c.Gtx.Set(constant.CTX_KEY_OF_TENANT_ID, tid)
+}
+
 func (c *Context) GetPathParamID(key string) (uint64, *exception.Exception) {
 	stringID := c.Gtx.Param(key)
 	ID := utils.StrToUint64(stringID)

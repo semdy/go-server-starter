@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
@@ -53,6 +54,7 @@ func (s *DeadLetterServiceImpl) Alert(ctx context.Context, info taskq.AlertInfo)
 // Store persists a dead letter to MySQL.
 func (s *DeadLetterServiceImpl) Store(ctx context.Context, info taskq.AlertInfo) {
 	dl := &model.DeadLetter{
+		TenantID:  cctx.GetTenantID(ctx),
 		TaskType: info.TaskType,
 		TaskID:   info.TaskID,
 		Payload:  info.Payload,
@@ -73,6 +75,7 @@ func (s *DeadLetterServiceImpl) Store(ctx context.Context, info taskq.AlertInfo)
 func (s *DeadLetterServiceImpl) List(ctx context.Context, params dto.DeadLetterListReqDto) (*dto.PaginationResDto[[]*dto.DeadLetterItem], *exception.Exception) {
 	opts := []repo.QueryOption{
 		repo.Order("failed_at DESC"),
+		repo.Where("tenant_id = ?", cctx.GetTenantID(ctx)),
 		repo.WherePtrNonEmpty("task_type = ?", params.TaskType),
 		repo.WherePtrNonEmpty("is_retried = ?", params.IsRetried),
 	}

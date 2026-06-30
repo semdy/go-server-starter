@@ -3,7 +3,7 @@ package jwt
 import (
 	"errors"
 	"go-server-starter/internal/config"
-	"go-server-starter/internal/ctx"
+	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"strings"
@@ -15,7 +15,8 @@ import (
 )
 
 type CustomClaims struct {
-	UniCode string `json:"uniCode"` // 用户唯一码
+	UniCode  string `json:"uniCode"`  // 用户唯一码
+	TenantID string `json:"tenantId"` // 租户 ID
 	jwt.RegisteredClaims
 }
 
@@ -34,7 +35,7 @@ func NewJWT(config *config.JWTConfig, logger *zap.Logger) *JWT {
 
 func (j *JWT) JWT() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var ctx = ctx.FromGinCtx(c)
+		var ctx = cctx.FromGinCtx(c)
 		token, err := j.GetTokenFromGinContext(c)
 		if err != nil {
 			ctx.ToError(exception.TokenNotFound.Append(err.Error()))
@@ -45,12 +46,15 @@ func (j *JWT) JWT() gin.HandlerFunc {
 			ctx.ToError(exception.TokenInvalid.Append(err.Error()))
 			return
 		}
-		// 设置用户唯一码
+		// 设置用户唯一码和租户 ID
 		ctx.SetUserUniCode(claims.UniCode)
+		ctx.SetTenantID(claims.TenantID)
+		// Inject tenant_id into context.Context for service-layer access
+		c.Request = c.Request.WithContext(cctx.WithTenant(c.Request.Context(), claims.TenantID))
 		// 判断是否需要刷新令牌
 		if j.isTokenNeedRefresh(ctx, claims.ExpiresAt.Time) {
 			// 刷新令牌
-			newToken, err := j.GenerateToken(claims.UniCode, ctx.GetDeviceType())
+			newToken, err := j.GenerateToken(claims.UniCode, claims.TenantID, ctx.GetDeviceType())
 			if err != nil {
 				ctx.ToError(exception.TokenGenerateFailed.Append(err.Error()))
 				return
@@ -61,7 +65,7 @@ func (j *JWT) JWT() gin.HandlerFunc {
 	}
 }
 
-func (j *JWT) isTokenNeedRefresh(ctx *ctx.Context, expiresAt time.Time) bool {
+func (j *JWT) isTokenNeedRefresh(ctx *cctx.Context, expiresAt time.Time) bool {
 	// 判断是否需要刷新令牌 还有多少时间过期
 	var remaining = time.Until(expiresAt)
 	expire := j.config.TokenExpires.Get(ctx.GetDeviceType())
@@ -88,11 +92,12 @@ func (j *JWT) GetTokenFromGinContext(c *gin.Context) (string, error) {
 	return token, nil
 }
 
-func (j *JWT) GenerateToken(uniCode string, deviceType enum.DeviceType) (string, error) {
+func (j *JWT) GenerateToken(uniCode, tenantID string, deviceType enum.DeviceType) (string, error) {
 	expire := j.config.TokenExpires.Get(deviceType)
 	now := time.Now()
 	claims := CustomClaims{
-		UniCode: uniCode,
+		UniCode:  uniCode,
+		TenantID: tenantID,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(expire)),
 			Issuer:    j.config.Issuer,

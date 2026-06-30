@@ -44,6 +44,9 @@ func (r *Router) SetupRoutes() {
 	// Admin DeadLetters - 死信管理（MySQL 落库 + 重试）
 	r.SetupDeadLetterRoutes()
 
+	// Admin Tenants - 租户管理
+	r.SetupTenantRoutes()
+
 	// Swagger API 文档
 	r.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 }

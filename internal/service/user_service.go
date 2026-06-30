@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
@@ -35,8 +36,17 @@ func NewUserService(repo repo.Repo, redis *redis.Client, logger *zap.Logger) Use
 	}
 }
 
+// tenantFilter returns a Where option for the current tenant.
+func tenantFilter(ctx context.Context) repo.QueryOption {
+	tid := cctx.GetTenantID(ctx)
+	if tid == "" {
+		tid = "default"
+	}
+	return repo.Where("tenant_id = ?", tid)
+}
+
 func (s *UserServiceImpl) GetByID(ctx context.Context, id uint64) (*model.User, *exception.Exception) {
-	user, err := s.repo.User().GetByID(ctx, id, repo.Preload("Roles"))
+	user, err := s.repo.User().GetByID(ctx, id, repo.Preload("Roles"), tenantFilter(ctx))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -47,7 +57,7 @@ func (s *UserServiceImpl) GetByID(ctx context.Context, id uint64) (*model.User, 
 }
 
 func (s *UserServiceImpl) GetByUniCode(ctx context.Context, uniCode string) (*model.User, *exception.Exception) {
-	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
+	user, err := s.repo.User().GetOne(ctx, repo.Where("uni_code = ?", uniCode), repo.Preload("Roles"), tenantFilter(ctx))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -63,7 +73,6 @@ func (s *UserServiceImpl) GetInfoByUniCode(ctx context.Context, uniCode string) 
 		return nil, err
 	}
 
-	// 转换角色为字符串数组
 	roles := make([]string, len(user.Roles))
 	for i, role := range user.Roles {
 		roles[i] = role.Code.String()
@@ -85,6 +94,7 @@ func (s *UserServiceImpl) GetTable(ctx context.Context, params dto.UserTableQuer
 	opts := []repo.QueryOption{
 		repo.Order("created_at DESC"),
 		repo.Preload("Roles"),
+		tenantFilter(ctx),
 		repo.WhereAutoLike("nickname", params.Nickname),
 		repo.WhereAutoLikePrefix("email", params.Email),
 		repo.WhereAutoLikePrefix("mobile", params.Mobile),
@@ -117,7 +127,7 @@ func (s *UserServiceImpl) GetTable(ctx context.Context, params dto.UserTableQuer
 }
 
 func (s *UserServiceImpl) UpdateInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
-	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
+	user, err := s.repo.User().GetOne(ctx, repo.Where("uni_code = ?", uniCode), repo.Preload("Roles"), tenantFilter(ctx))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}

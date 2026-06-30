@@ -18,6 +18,7 @@ type Service interface {
 	Auth() AuthService
 	VerifyCode() VerifyCodeService
 	DeadLetter() DeadLetterService
+	Tenant() TenantService
 }
 
 type ServiceImpl struct {
@@ -32,6 +33,7 @@ type ServiceImpl struct {
 	authService         AuthService
 	verifyCodeService   VerifyCodeService
 	deadLetterService   DeadLetterService
+	tenantService       TenantService
 }
 
 func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, taskqClient *taskq.Client, logger *zap.Logger) Service {
@@ -44,9 +46,10 @@ func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.C
 		logger:            logger,
 		userService:       NewUserService(repo, redis, logger),
 		userRoleService:   NewUserRoleService(repo, redis, logger),
-		authService:       NewAuthService(repo, jwt, taskqClient, logger),
+		authService:       NewAuthService(repo, jwt, taskqClient, snowflake, logger),
 		verifyCodeService: NewVerifyCodeService(redis.Client, taskqClient, logger),
 		deadLetterService: NewDeadLetterService(repo, taskqClient, logger),
+		tenantService:     NewTenantService(repo, snowflake, logger),
 	}
 }
 
@@ -68,4 +71,8 @@ func (s *ServiceImpl) VerifyCode() VerifyCodeService {
 
 func (s *ServiceImpl) DeadLetter() DeadLetterService {
 	return s.deadLetterService
+}
+
+func (s *ServiceImpl) Tenant() TenantService {
+	return s.tenantService
 }
