@@ -245,7 +245,7 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 修改 API 注解后重新生成文档：
 
 ```bash
-swag init -g cmd/server/server.go -o docs
+swag init -g cmd/server/server.go -o docs --parseDependency --parseInternal
 ```
 
 ## 🌍 国际化

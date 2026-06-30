@@ -28,6 +28,18 @@ definitions:
       token:
         type: string
     type: object
+  go-server-starter_internal_dto.CreateUserReqDto:
+    properties:
+      email:
+        type: string
+      nickname:
+        maxLength: 20
+        minLength: 2
+        type: string
+    required:
+    - email
+    - nickname
+    type: object
   go-server-starter_internal_dto.DeadLetterItem:
     properties:
       attempt:
@@ -54,6 +66,23 @@ definitions:
       data:
         items:
           $ref: '#/definitions/go-server-starter_internal_dto.DeadLetterItem'
+        type: array
+      hasNext:
+        type: boolean
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPage:
+        type: integer
+    type: object
+  go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_TenantResDto:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.TenantResDto'
         type: array
       hasNext:
         type: boolean
@@ -123,6 +152,47 @@ definitions:
     required:
     - countryCode
     - mobile
+    type: object
+  go-server-starter_internal_dto.TenantCreateReqDto:
+    properties:
+      code:
+        maxLength: 64
+        minLength: 2
+        type: string
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - code
+    - name
+    type: object
+  go-server-starter_internal_dto.TenantResDto:
+    properties:
+      code:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  go-server-starter_internal_dto.TenantUpdateReqDto:
+    properties:
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      status:
+        enum:
+        - active
+        - disabled
+        type: string
     type: object
   go-server-starter_internal_dto.UserInfoResDto:
     properties:
@@ -338,6 +408,169 @@ paths:
       summary: 批量重试死信
       tags:
       - admin
+  /admin/tenants:
+    get:
+      consumes:
+      - application/json
+      description: 分页查询租户列表，支持按 status 筛选。仅 super_admin 可访问。
+      parameters:
+      - description: '状态: active/disabled'
+        in: query
+        name: status
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页条数
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_TenantResDto'
+      security:
+      - BearerAuth: []
+      summary: 租户列表
+      tags:
+      - tenant
+    post:
+      consumes:
+      - application/json
+      description: 创建新租户。code 不可重复。仅 super_admin 可访问。
+      parameters:
+      - description: 租户信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.TenantCreateReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.TenantResDto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 创建租户
+      tags:
+      - tenant
+  /admin/tenants/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 软删除指定租户。仅 super_admin 可访问。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 删除租户（软删除）
+      tags:
+      - tenant
+    get:
+      consumes:
+      - application/json
+      description: 根据 ID 查询租户详情。仅 super_admin 可访问。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.TenantResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 查询租户
+      tags:
+      - tenant
+    put:
+      consumes:
+      - application/json
+      description: 更新租户名称或状态。仅 super_admin 可访问。
+      parameters:
+      - description: 租户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.TenantUpdateReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.TenantResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 更新租户
+      tags:
+      - tenant
+  /admin/tenants/code:
+    get:
+      consumes:
+      - application/json
+      description: 使用 Snowflake 生成全局唯一的租户 Code。仅 super_admin 可访问。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 生成租户 Code
+      tags:
+      - tenant
   /auth/login/email:
     post:
       consumes:
@@ -384,6 +617,10 @@ paths:
       - description: '设备类型: web/desktop/mobile/chromeExtension/api'
         in: header
         name: Device-Type
+        type: string
+      - description: 租户 ID (默认 default)
+        in: header
+        name: X-Tenant-ID
         type: string
       produces:
       - application/json
@@ -446,6 +683,27 @@ paths:
       summary: 发送短信验证码
       tags:
       - auth
+  /healthz:
+    get:
+      consumes:
+      - application/json
+      description: 返回服务及依赖（DB、Redis）的健康状态
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 健康检查
+      tags:
+      - health
   /hello:
     get:
       consumes:
@@ -616,25 +874,138 @@ paths:
       summary: 角色列表
       tags:
       - role
+  /user/admin:
+    post:
+      consumes:
+      - application/json
+      description: 在管理员所属租户下创建用户。同一租户内 email 不可重复。需 admin+ 角色。
+      parameters:
+      - description: 用户信息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.CreateUserReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserInfoResDto'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 创建用户（管理员）
+      tags:
+      - user
+  /user/admin/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: 软删除用户，自动校验与管理员属于同一租户。需 admin+ 角色。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 删除用户（管理员）
+      tags:
+      - user
+    get:
+      consumes:
+      - application/json
+      description: 根据 ID 查询任意用户详情。需 admin+ 角色。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserInfoResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 查询用户（管理员）
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      description: 管理员更新任意用户的昵称、头像、简介。需 admin+ 角色。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserUpdateInfoReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserInfoResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 更新用户（管理员）
+      tags:
+      - user
   /user/admin/table:
     get:
       consumes:
       - application/json
-      description: 分页查询用户列表，支持按昵称、邮箱、手机号筛选。需要 admin 或 super_admin 角色。
+      description: 分页查询用户列表，支持按昵称、邮箱、手机号筛选。需 admin+ 角色。
       parameters:
       - description: 昵称（模糊）
         in: query
         name: nickname
         type: string
-      - description: 邮箱（前缀匹配）
+      - description: 邮箱（前缀）
         in: query
         name: email
         type: string
-      - description: 手机号（前缀匹配）
+      - description: 手机号（前缀）
         in: query
         name: mobile
         type: string
-      - description: 国家代码（前缀匹配）
+      - description: 国家代码（前缀）
         in: query
         name: countryCode
         type: string
@@ -670,11 +1041,11 @@ paths:
       summary: 用户列表（管理员）
       tags:
       - user
-  /user/info:
+  /user/my-info:
     get:
       consumes:
       - application/json
-      description: 根据 JWT token 中的 uniCode 返回用户详情及角色列表
+      description: 根据 JWT token 返回当前登录用户的详情及角色列表
       produces:
       - application/json
       responses:
@@ -717,7 +1088,7 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: 更新用户信息
+      summary: 更新当前用户信息
       tags:
       - user
 securityDefinitions:

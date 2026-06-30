@@ -245,7 +245,7 @@ Start the server and open `http://localhost:8080/api/swagger/index.html` for int
 To regenerate docs after changing API annotations:
 
 ```bash
-swag init -g cmd/server/server.go -o docs
+swag init -g cmd/server/server.go -o docs --parseDependency --parseInternal
 ```
 
 ## 🌍 Internationalization
