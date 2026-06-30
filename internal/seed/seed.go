@@ -2,11 +2,13 @@ package seed
 
 import (
 	"context"
+	"errors"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type Seed interface {
@@ -35,7 +37,7 @@ func (s *seed) Run() error {
 func (s *seed) SeedDefaultTenant() error {
 	ctx := context.Background()
 	existing, err := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", "default"))
-	if err != nil {
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 	if existing != nil {
