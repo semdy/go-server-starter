@@ -8,6 +8,7 @@ import (
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/handler"
 	"go-server-starter/internal/middleware"
+	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/internal/router"
 	"go-server-starter/internal/seed"
@@ -188,6 +189,9 @@ func (a *App) Start() error {
 		return err
 	}
 	a.snowflake = snowflake
+
+	// 注入 Snowflake ID 生成器，所有 GORM Create 自动使用
+	model.GenerateID = func() uint64 { return uint64(snowflake.GenerateID()) }
 
 	// 初始化repo
 	a.repo = repo.NewRepo(
