@@ -136,10 +136,6 @@ func HandleEmailWelcome(ctx context.Context, task *asynq.Task) error {
 		return asynq.SkipRetry
 	}
 
-	if HandlerDeps.EmailSender == nil {
-		return asynq.SkipRetry
-	}
-
 	// Render welcome email from template
 	html, err := welcomeEmailHTML(payload)
 	if err != nil {
@@ -156,10 +152,6 @@ func HandleSendSMSCode(ctx context.Context, task *asynq.Task) error {
 		return asynq.SkipRetry
 	}
 
-	if HandlerDeps.SmsSender == nil {
-		return asynq.SkipRetry
-	}
-
 	params := map[string]string{"code": payload.Code}
 	return HandlerDeps.SmsSender.SendSMS(ctx, payload.Mobile, HandlerDeps.SMSSignName, HandlerDeps.SMSTemplateCode, params)
 }
@@ -168,10 +160,6 @@ func HandleSendSMSCode(ctx context.Context, task *asynq.Task) error {
 func HandleSendEmailCode(ctx context.Context, task *asynq.Task) error {
 	var payload SendEmailCodePayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
-		return asynq.SkipRetry
-	}
-
-	if HandlerDeps.EmailSender == nil {
 		return asynq.SkipRetry
 	}
 
