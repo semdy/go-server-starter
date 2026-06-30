@@ -20,29 +20,36 @@ var sensitiveHeaders = map[string]bool{
 func ZapLogger(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		var URL = c.Request.URL
-		headers := c.Request.Header
-		headersMap := make(map[string]string)
-		for k, v := range headers {
-			if sensitiveHeaders[k] {
-				headersMap[k] = "[REDACTED]"
-			} else {
-				headersMap[k] = strings.Join(v, ",")
-			}
-		}
 		c.Next()
-		timeSpend := time.Since(start)
-		timeSpendMs := float64(timeSpend.Microseconds()) / 1000.0
-		logger.Info("request",
-			zap.Int("status", c.Writer.Status()),
-			zap.String("method", c.Request.Method),
-			zap.String("path", URL.Path),
-			zap.String("query", URL.RawQuery),
-			zap.Any("headers", headersMap),
-			zap.String("ip", c.ClientIP()),
-			zap.String("user-agent", c.Request.UserAgent()),
-			zap.Float64("time_spend_ms", timeSpendMs),
-		)
+
+		// Skip allocation if Info level is not enabled (e.g. production at Warn)
+		if ce := logger.Check(zap.InfoLevel, "request"); ce != nil {
+			timeSpend := time.Since(start)
+			fields := []zap.Field{
+				zap.Int("status", c.Writer.Status()),
+				zap.String("method", c.Request.Method),
+				zap.String("path", c.Request.URL.Path),
+				zap.String("query", c.Request.URL.RawQuery),
+				zap.String("ip", c.ClientIP()),
+				zap.String("user-agent", c.Request.UserAgent()),
+				zap.Float64("time_spend_ms", float64(timeSpend.Microseconds())/1000.0),
+			}
+
+			// Only build header map when actually logging
+			if len(c.Request.Header) > 0 {
+				headersMap := make(map[string]string, len(c.Request.Header))
+				for k, v := range c.Request.Header {
+					if sensitiveHeaders[k] {
+						headersMap[k] = "[REDACTED]"
+					} else {
+						headersMap[k] = strings.Join(v, ",")
+					}
+				}
+				fields = append(fields, zap.Any("headers", headersMap))
+			}
+
+			ce.Write(fields...)
+		}
 	}
 }
 
