@@ -28,7 +28,7 @@ go test ./...
 go test ./internal/service/... -v -count=1
 
 # Single test
-go test ./internal/service/... -run TestVerifyCode -v
+go test ./internal/service/... -run TestNewAuthService -v
 ```
 
 ## Local Dev Environment
@@ -51,29 +51,32 @@ Secrets: copy `configs/config.dev.yml.example` to `configs/config.dev.yml` (giti
 **Layered architecture** with strict inward dependency flow:
 
 ```
-Handler (HTTP binding, response) → Service (business logic, transactions) → Repository (data access)
+Handler (HTTP binding) → Service (business logic, transactions) → Repository (data access)
 ```
 
 - `internal/` is private application code; `pkg/` is reusable libraries.
 - All layers communicate through interfaces defined alongside implementations.
-- Dependency injection is manual in `internal/app/app.go` — `App.Start()` wires everything in explicit order.
-- There is no DI framework.
+- Dependency injection is manual in `internal/app/app.go` — `App.Start()` wires everything in explicit order. No DI framework.
 
 ### Service layer — `context.Context`, not `*gin.Context`
 
-Service methods accept `context.Context` (stdlib) and explicit parameters. The custom `*ctx.Context` is only used in handlers and middleware. This keeps services testable with `context.Background()` and reusable outside HTTP (gRPC, CLI, task workers).
+Service methods accept `context.Context` (stdlib) and explicit parameters. The custom `*ctx.Context` is only used in handlers and middleware. Services are testable with `context.Background()` and reusable outside HTTP.
 
 ```go
 // Service — framework-agnostic
 func (s *UserServiceImpl) GetByID(ctx context.Context, id uint64) (*model.User, *exception.Exception)
 
 // Handler — extracts values from Gin, then calls service
-func (h *UserHandlerImpl) GetInfo(c *gin.Context) {
+func (h *UserHandlerImpl) GetMyInfo(c *gin.Context) {
     appCtx := ctx.FromGinCtx(c)
     user, _ := h.service.User().GetByID(appCtx.Ctx, id)
     appCtx.ToSuccess(user)
 }
 ```
+
+### Tenant ID in context.Context
+
+`internal/ctx/tenant.go` provides `WithTenant(ctx, tid)` / `GetTenantID(ctx)` for storing tenant_id in `context.Context`. JWT middleware injects it from claims. Services call `cctx.GetTenantID(ctx)` to apply `tenantFilter(ctx)` in queries.
 
 ### Key Patterns
 
@@ -81,123 +84,107 @@ func (h *UserHandlerImpl) GetInfo(c *gin.Context) {
 
 **QueryOption functions** (`internal/repo/repo_option.go`): composable `func(*gorm.DB) *gorm.DB` passed as variadic args. Column-name functions (`WhereAutoLike*`) validate against a safe regex and backtick-quote — use `quoteColumnName()` for new ones.
 
-**Custom Context** (`internal/ctx/ctx.go`): wraps `context.Context` + `*gin.Context`. Used only in handlers/middleware. Provides `ShouldBind` (i18n validation errors), `ToSuccess`/`ToError` (JSON `{code, message, data/details}` envelope), and `GetUserUniCode`/`GetDeviceType` extraction.
+**Custom Context** (`internal/ctx/ctx.go`): wraps `context.Context` + `*gin.Context`. Used only in handlers/middleware. Provides `ShouldBind` (i18n validation errors), `ToSuccess`/`ToError` (JSON `{code, message, data/details}` envelope), `GetUserUniCode`/`GetTenantID`/`GetDeviceType` extraction.
 
 **Exception system** (`internal/exception/`): domain errors carry HTTP status + business code + i18n messages. Scoped codes: Common=1000, User=20000, UserRole=21000. Service returns `(*Result, *exception.Exception)`; handler converts to JSON via `ctx.ToError()`.
 
-**i18n** (`internal/i18n/`): `Text{En, Zh}` structs. Locale from `locale` header or `Accept-Language`.
+**i18n** (`internal/i18n/`): `Text{En, Zh}` structs. `Tf()` convenience method for key-value pairs: `i18n.EchoHello.Tf(ctx.GetLocale(), "name", name)`.
 
-**Swagger** (`internal/handler/*.go`): swaggo annotations on handler methods. Generated docs at `docs/`. Regenerate with `swag init -g cmd/server/server.go -o docs`. UI at `/api/swagger/index.html`.
+**Swagger**: swaggo annotations on handler methods. Regenerate: `swag init -g cmd/server/server.go -o docs`. UI at `/api/swagger/index.html`.
+
+### Snowflake IDs
+
+All models embed `Model` which has `BeforeCreate` hook — auto-generates Snowflake ID when caller doesn't set one. `model.GenerateID` is set in `app.go` from the Snowflake node. No explicit `snowflake.GenerateID()` calls needed in business code.
 
 ### Middleware Stack (order matters)
 
 1. `gin.Recovery()` — panic recovery
-2. `ZapLogger` — request logging (redacts Authorization/Cookie)
+2. `ZapLogger` — request logging (redacts Authorization/Cookie; level-guarded with `zap.Check`)
 3. `ZapRecovery` — panic recovery with stack traces in dev mode
 4. `CORS` — dev mode only
-5. `Translations` — locale extraction
-6. `RateLimit(100)` — per-IP, 100 req/min via Redis GCRA algorithm
+5. `Translations` — locale extraction (`Accept-Language` cached via `sync.Map`)
+6. `RateLimit(100)` — per-IP, 100 req/min via Redis GCRA; falls back to local sliding window when Redis is down
 
-Route-group middleware: `jwt.JWT()` (token validation + auto-refresh when < 1/3 remaining), `auth.RoleCheckAny()` / `auth.RoleCheckAll()` for RBAC.
+Route-group middleware: `jwt.JWT()` (token validation + auto-refresh when < 1/3 remaining), `auth.RoleCheckAny()` / `auth.RoleCheckAll()` for static roles, `auth.RoleCheckAnyS()` / `auth.RoleCheckAllS()` for dynamic (string) roles.
 
 ### RBAC
 
-JWT carries `uniCode` in claims. `pkg/auth/` middleware fetches user roles via `UserRoleService.GetCachedRolesCodeByUniCode` (Redis cache-aside with 5min TTL + singleflight dedup). Role changes invalidate the cache. Routes declare access inline:
+JWT carries `uniCode` + `tenantID` in claims. `pkg/auth/` middleware fetches roles via `UserRoleService.GetCachedRolesCodeByUniCode` (Redis cache-aside with 5min TTL + singleflight dedup). Role mutations invalidate cache. Predefined roles: `super_admin`, `admin`, `guest`, `user`, `user_vip`, `user_svip`. Dynamic roles use string variants `RoleCheckAnyS("editor")`.
 
-```go
-router.Use(r.jwt.JWT(), r.auth.RoleCheckAny(enum.RoleCodeAdmin, enum.RoleCodeSuperAdmin))
-```
+### Token Auto-Refresh
+
+When remaining TTL < 1/3 of total, server issues new token in `new-token` response header. Client captures and replaces old token. Overlap window ensures no request is rejected.
 
 ### Database
 
 - MySQL via GORM; database auto-created (`CREATE DATABASE IF NOT EXISTS`).
-- **Migrations**: [goose](https://github.com/pressly/goose) with embedded SQL in `internal/database/migration/migrations/`. Run on startup via `migration.Run(sqlDB)`. Each migration has `.up.sql` + `.down.sql`. GORM AutoMigrate is no longer used.
-- **Seed**: inserts 6 default roles (idempotent).
-- To add a table: create a goose migration pair — the `embed` directive picks it up automatically.
+- **Migrations**: [goose](https://github.com/pressly/goose) with embedded SQL in `internal/database/migration/migrations/`. Run on startup via `migration.Run(sqlDB)`. Single-file format with `-- +goose Up` / `-- +goose Down` markers. `goose_db_version` tracks applied versions.
+- **Seed**: inserts 6 default roles + default tenant "default" (both idempotent).
+- **Indexes/constraints**: defined exclusively in migration SQL. GORM struct tags serve as documentation only.
 
 ### Config Loading
 
-**koanf v2** (migrated from Viper). Priority: `DefaultConfig` → `config.yml` → `config.{mode}.yml` → env vars.
+**koanf v2**. Priority: `DefaultConfig` → `config.yml` → `config.{mode}.yml` → env vars.
 
-- Env vars use `APP_` prefix. All-lowercase keys (e.g. `database.password`) map automatically. CamelCase keys are explicitly bound via `bindEnv()` in `config.go`. To add a new camelCase key, add it to the `bindEnv` call.
-- Struct tags use `koanf:"..."`.
+- Env vars use `APP_` prefix. All-lowercase keys map automatically (e.g. `APP_DATABASE_PASSWORD`). CamelCase keys require explicit `bindEnv()` entries in `config.go`.
+- Struct tags use `koanf:"..."`. Defaults from `DefaultConfig` struct.
 
 ### Task Queue (Asynq)
 
-`pkg/taskq/` wraps Asynq with Redis-backed workers. Start-up flow in `app.go`:
+`pkg/taskq/` wraps Asynq with Redis-backed workers (`--appendonly yes --appendfsync everysec` for persistence).
 
-```
-taskqClient + taskqServer → register handlers → go taskqServer.Start()
-```
-
-Key features:
-- **`EnqueueUnique`**: deduplicates tasks by `(TaskID, Unique TTL)` via Redis SETNX.
+- **`EnqueueUnique`**: idempotent enqueue via Redis SETNX (TaskID + Unique TTL).
 - **`RetryByType`**: per-task-type `MaxRetry` + `Timeout`.
-- **`HandlerDeps`**: global dependency bag set in `app.go` (SMS/Email senders, template codes).
-- **`Alerter`**: pluggable interface called when retries are exhausted (write to DB, Slack, etc.).
-- **`Server.SetAlerter()`**: thread-safe late binding — set after service layer is initialized.
+- **`Alerter`**: pluggable interface called when retries exhaust. Currently `DeadLetterService` implements it — writes to MySQL `dead_letters` table.
+- **`Server.SetAlerter()`**: thread-safe late binding via `atomic.Pointer`.
 
-Adding a task: define constant + payload in `tasks.go` → constructor → handler → register in `app.go` → enqueue from service.
+### Dead Letters
 
-### Dead Letters (MySQL-backed)
-
-Retry-exhausted tasks are persisted to MySQL `dead_letters` table via `DeadLetterService.Alert()` (implements `taskq.Alerter`). Admin API at `/api/admin/dead-letters`:
-
-```
-GET  ?taskType=email:welcome    — list
-POST /retry  {"id": 5}          — re-enqueue + mark is_retried
-POST /retry-all?taskType=...    — batch retry
-DELETE  {"id": 5}                — hard delete
-```
+Two-tier: Asynq auto-archives to Redis (visible in `asynqmon`). Exhausted retries also persist to MySQL `dead_letters` table via `DeadLetterService.Alert()`. Admin API at `/api/admin/dead-letters` supports list, retry, batch retry, and delete.
 
 ### Verification Codes & Notifications
 
-`pkg/verify_code/` stores codes in Redis (5min TTL, 60s resend cooldown). Sending is async via taskq:
+`pkg/verify_code/`: Redis-backed codes (5min TTL, 60s resend cooldown). Handler validates code via `VerifyCodeService.Validate()` before calling login.
 
-```
-POST /api/auth/send-sms-code → generate code → Redis SETEX → taskq.EnqueueUnique → Alibaba Cloud SMS
-POST /api/auth/login/mobile  → Redis GET compare → DEL on match → JWT
-```
+`pkg/notify/`: `SmsSender`/`EmailSender` interfaces. Alibaba Cloud implementations in `alisms.go`/`alimail.go`. Dev default is `LogSender` (no-op). Email templates embedded via `embed.FS` in `pkg/notify/template/`.
 
-`pkg/notify/` provides `SmsSender` and `EmailSender` interfaces. Alibaba Cloud implementations in `alisms.go` / `alimail.go`. Dev default is `LogSender` (no-op). Templates embedded via `embed.FS` in `pkg/notify/template/`.
+### Cron Scheduler
 
-### Adding a New Entity
+`pkg/cronjob/`: `robfig/cron` wrapper registered in `register.go`. `app.go` only calls `Register()`/`Start()`/`Stop()`. Add jobs to the `Register()` function.
 
-1. Create goose migration (`0000x_name.{up,down}.sql`)
-2. Define model in `internal/model/`
-3. (Optional) Create repo in `internal/repo/`
-4. (Optional) Create DTOs in `internal/dto/`
-5. Create service in `internal/service/`
-6. Create handler in `internal/handler/`
-7. Register routes in `internal/router/`
-8. Wire into `Handler`/`Service`/`Repo` aggregation interfaces
+### Scaffolding
 
-The `generate.sh` script scaffolds model/repo/dto/service/handler boilerplate.
+`./generate.sh product` creates a full CRUD module (model/repo/dto/service/handler/router/migration) and auto-registers into `repo.go`/`service.go`/`handler.go`/`router.go`, then runs `gofmt -w` on them. `./generate.sh -d product` deletes. See README for the 12-file breakdown.
 
 ### Key Dependencies
 
 | Purpose | Library |
 |---------|---------|
-| HTTP framework | Gin v1.11 |
-| ORM | GORM + MySQL driver |
+| HTTP framework | Gin |
+| ORM | GORM + MySQL |
 | Redis | go-redis/v9 |
 | JWT | golang-jwt/v5 |
-| Logging | Zap + Lumberjack (rotation) |
+| Logging | Zap + Lumberjack |
 | Config | koanf v2 (env prefix: `APP_`) |
-| Task queue | Asynq + Redis AOF persistence |
+| Task queue | Asynq (Redis AOF) |
 | Migrations | goose (embedded SQL) |
-| ID generation | bwmarrin/snowflake |
+| ID generation | bwmarrin/snowflake (BeforeCreate hook) |
 | Validation | go-playground/validator/v10 |
 | SMS/Email | Alibaba Cloud SDK (pluggable) |
+| Cron | robfig/cron |
 | API docs | swaggo/swag + gin-swagger |
-| Dev hot reload | Air (`.air.toml`) |
+| Dev | Air (`.air.toml`) |
 
 ## Notes
 
-- **Secrets**: `configs/config.{dev,test,prod}.yml` and `.env` are gitignored. Use `config.dev.yml.example` as template. Env vars with `APP_` prefix override config file values. Alibaba Cloud credentials go in config file or env vars.
-- **Zap vs slog**: Zap is kept. Multi-core output (info.log / error.log + console) with Lumberjack rotation cannot be easily replicated with slog.
-- **Config struct tags**: Use `koanf:"..."`. CamelCase keys need a `bindEnv` entry in `config.go`.
-- **QueryOption column safety**: `WhereAutoLike*` validate column names via `quoteColumnName()`. Follow this pattern for new dynamic-column functions.
-- **Service layer**: Services accept `context.Context`, not `*gin.Context`. The custom `*ctx.Context` stays in handlers/middleware.
-- **Test mocks**: Stub implementations embed the real repo interfaces and override only needed methods. See `*_test.go` in `internal/service/`.
-- **Redis persistence**: docker-compose enables AOF (`--appendonly yes --appendfsync everysec`) to survive restarts without losing tasks.
+- **Secrets**: `configs/config.{dev,test,prod}.yml` and `.env` are gitignored. Use `config.dev.yml.example` as template. Env vars with `APP_` prefix override config file values.
+- **Zap**: Multi-core output (info.log / error.log + console) with Lumberjack rotation. ZapLogger uses `logger.Check()` to skip allocation when log level is above Info.
+- **RateLimit**: Falls back to local sliding window when Redis is unreachable — no cascading 500s.
+- **Config tags**: Use `koanf:"..."`. CamelCase keys need `bindEnv` entry.
+- **QueryOption safety**: `WhereAutoLike*` validate column names via `quoteColumnName()`.
+- **Service layer**: Services accept `context.Context`. The custom `*ctx.Context` stays in handlers/middleware.
+- **Test mocks**: Stub implementations embed real repo interfaces, override only needed methods.
+- **Redis persistence**: docker-compose enables AOF (`--appendonly yes --appendfsync everysec`).
+- **gofmt on save**: `.zed/settings.json` configures `format_on_save`.
+- **Snowflake IDs**: `model.BeforeCreate` hook auto-fills; migration SQL has `BIGINT UNSIGNED PRIMARY KEY` without `AUTO_INCREMENT`.
+- **Login = register**: New users auto-register with default tenant and "user" role. No explicit registration endpoint.
