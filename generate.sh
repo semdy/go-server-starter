@@ -375,9 +375,92 @@ EOF
     echo "[ok] Created: $MIGRATION_UP"
 fi
 
-# ---- Summary with registration instructions ----
+# ---- Auto-register in aggregation files ----
+# Uses line-number insertion (reliable across file layouts)
+
+insert_before_line() { # file line_num replacement_line
+    local file=$1 lineno=$2 replacement=$3
+    sed -i '' "${lineno}s/.*/${replacement}\\
+&/" "$file"
+}
+
+# repo.go
+REPO_GO="internal/repo/repo.go"
+if ! grep -q "${MODULE_NAME_UPPER}Repo" "$REPO_GO" 2>/dev/null; then
+    # interface: find the first `}` after "type Repo interface"
+    LINE=$(grep -n "^}" "$REPO_GO" | head -1 | cut -d: -f1)
+    insert_before_line "$REPO_GO" "$LINE" "	${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Repo"
+
+    # struct: find the `}` after "type RepoImpl struct"
+    START=$(grep -n "type RepoImpl struct" "$REPO_GO" | cut -d: -f1)
+    LINE=$(grep -n "^}" "$REPO_GO" | awk -F: -v s="$START" '$1>s{print $1; exit}')
+    insert_before_line "$REPO_GO" "$LINE" "	${MODULE_NAME_LOWER}Repo      ${MODULE_NAME_UPPER}Repo"
+
+    # constructor: find the `}` after "func NewRepo"
+    START=$(grep -n "func NewRepo" "$REPO_GO" | cut -d: -f1)
+    LINE=$(grep -n "^	\}$" "$REPO_GO" | awk -F: -v s="$START" '$1>s{print $1; exit}')
+    insert_before_line "$REPO_GO" "$LINE" "		${MODULE_NAME_LOWER}Repo:     New${MODULE_NAME_UPPER}Repo(db, logger),"
+
+    # accessor: append to EOF
+    printf '\nfunc (r *RepoImpl) %s() %sRepo {\n\treturn r.%sRepo\n}\n' "${MODULE_NAME_UPPER}" "${MODULE_NAME_UPPER}" "${MODULE_NAME_LOWER}" >> "$REPO_GO"
+    echo "[ok] Registered in repo.go"
+fi
+
+# service.go
+SVC_GO="internal/service/service.go"
+if ! grep -q "${MODULE_NAME_UPPER}Service" "$SVC_GO" 2>/dev/null; then
+    LINE=$(grep -n "^}" "$SVC_GO" | head -1 | cut -d: -f1)
+    insert_before_line "$SVC_GO" "$LINE" "	${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Service"
+
+    START=$(grep -n "type ServiceImpl struct" "$SVC_GO" | cut -d: -f1)
+    LINE=$(grep -n "^}" "$SVC_GO" | awk -F: -v s="$START" '$1>s{print $1; exit}')
+    insert_before_line "$SVC_GO" "$LINE" "	${MODULE_NAME_LOWER}Service       ${MODULE_NAME_UPPER}Service"
+
+    START=$(grep -n "func NewService" "$SVC_GO" | cut -d: -f1)
+    LINE=$(grep -n "^	\}$" "$SVC_GO" | awk -F: -v s="$START" '$1>s{print $1; exit}')
+    insert_before_line "$SVC_GO" "$LINE" "		${MODULE_NAME_LOWER}Service:     New${MODULE_NAME_UPPER}Service(repo, logger),"
+
+    printf '\nfunc (s *ServiceImpl) %s() %sService {\n\treturn s.%sService\n}\n' "${MODULE_NAME_UPPER}" "${MODULE_NAME_UPPER}" "${MODULE_NAME_LOWER}" >> "$SVC_GO"
+    echo "[ok] Registered in service.go"
+fi
+
+# handler.go
+HDL_GO="internal/handler/handler.go"
+if ! grep -q "${MODULE_NAME_UPPER}Handler" "$HDL_GO" 2>/dev/null; then
+    LINE=$(grep -n "^}" "$HDL_GO" | head -1 | cut -d: -f1)
+    insert_before_line "$HDL_GO" "$LINE" "	${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Handler"
+
+    START=$(grep -n "type HandlerImpl struct" "$HDL_GO" | cut -d: -f1)
+    LINE=$(grep -n "^}" "$HDL_GO" | awk -F: -v s="$START" '$1>s{print $1; exit}')
+    insert_before_line "$HDL_GO" "$LINE" "	${MODULE_NAME_LOWER}Handler     ${MODULE_NAME_UPPER}Handler"
+
+    START=$(grep -n "func NewHandler" "$HDL_GO" | cut -d: -f1)
+    LINE=$(grep -n "^	\}$" "$HDL_GO" | awk -F: -v s="$START" '$1>s{print $1; exit}')
+    insert_before_line "$HDL_GO" "$LINE" "		${MODULE_NAME_LOWER}Handler:     New${MODULE_NAME_UPPER}Handler(logger, service),"
+
+    printf '\nfunc (h *HandlerImpl) %s() %sHandler {\n\treturn h.%sHandler\n}\n' "${MODULE_NAME_UPPER}" "${MODULE_NAME_UPPER}" "${MODULE_NAME_LOWER}" >> "$HDL_GO"
+    echo "[ok] Registered in handler.go"
+fi
+
+# router.go
+RTR_GO="internal/router/router.go"
+if ! grep -q "Setup${MODULE_NAME_UPPER}Routes" "$RTR_GO" 2>/dev/null; then
+    LINE=$(grep -n "Swagger API 文档" "$RTR_GO" | cut -d: -f1)
+    # Insert route call + blank line before Swagger
+    sed -i '' "${LINE}i\\
+	// ${MODULE_NAME_UPPER} management\\
+	r.Setup${MODULE_NAME_UPPER}Routes()\\
+\\
+" "$RTR_GO"
+    echo "[ok] Registered in router.go"
+fi
+
+# ---- Summary ----
+# Auto-format modified files
+gofmt -w "$REPO_GO" "$SVC_GO" "$HDL_GO" "$RTR_GO" 2>/dev/null
+
 echo ""
-echo "✅ Module '$MODULE_NAME_UPPER' generated successfully!"
+echo "✅ Module '$MODULE_NAME_UPPER' generated and registered!"
 echo ""
 echo "  New files:"
 echo "    $MODEL_FILE"
@@ -388,33 +471,16 @@ echo "    $HANDLER_FILE"
 echo "    $ROUTER_FILE"
 echo "    $MIGRATION_UP"
 echo ""
-echo "  Register in the aggregation files (3 files, 1 line each):"
+echo "  Auto-registered in:"
+echo "    repo.go  ✓"
+echo "    service.go ✓"
+echo "    handler.go ✓"
+echo "    router.go ✓"
 echo ""
-echo "  repo.go:"
-echo "    interface  →  ${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Repo"
-echo "    struct     →  ${MODULE_NAME_LOWER}Repo ${MODULE_NAME_UPPER}Repo"
-echo "    NewRepo    →  ${MODULE_NAME_LOWER}Repo: New${MODULE_NAME_UPPER}Repo(db, logger),"
-echo "    accessor   →  func (r *RepoImpl) ${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Repo { return r.${MODULE_NAME_LOWER}Repo }"
-echo ""
-echo "  service.go:"
-echo "    interface  →  ${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Service"
-echo "    struct     →  ${MODULE_NAME_LOWER}Service ${MODULE_NAME_UPPER}Service"
-echo "    NewService →  ${MODULE_NAME_LOWER}Service: New${MODULE_NAME_UPPER}Service(repo, logger),"
-echo "    accessor   →  func (s *ServiceImpl) ${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Service { return s.${MODULE_NAME_LOWER}Service }"
-echo ""
-echo "  handler.go:"
-echo "    interface  →  ${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Handler"
-echo "    struct     →  ${MODULE_NAME_LOWER}Handler ${MODULE_NAME_UPPER}Handler"
-echo "    NewHandler →  ${MODULE_NAME_LOWER}Handler: New${MODULE_NAME_UPPER}Handler(logger, service),"
-echo "    accessor   →  func (h *HandlerImpl) ${MODULE_NAME_UPPER}() ${MODULE_NAME_UPPER}Handler { return h.${MODULE_NAME_LOWER}Handler }"
-echo ""
-echo "  router.go:"
-echo "    SetupRoutes →  r.Setup${MODULE_NAME_UPPER}Routes()"
-echo ""
-echo "  After registration:"
+echo "  Next:"
 echo "    1. Fill model fields in $MODEL_FILE"
 echo "    2. Complete migration SQL in $MIGRATION_UP"
 echo "    3. Fill DTO fields in $DTO_FILE"
-echo "    4. Implement business logic in $SERVICE_FILE"
+echo "    4. TODO comments in $SERVICE_FILE"
 echo "    5. Add swagger annotations to $HANDLER_FILE"
 echo "    6. Restart to run migrations"

@@ -18,12 +18,12 @@ type Repo interface {
 }
 
 type RepoImpl struct {
-	db              *gorm.DB
-	logger          *zap.Logger
-	userRepo        UserRepo
-	userRoleRepo    UserRoleRepo
-	deadLetterRepo  DeadLetterRepo
-	tenantRepo      TenantRepo
+	db             *gorm.DB
+	logger         *zap.Logger
+	userRepo       UserRepo
+	userRoleRepo   UserRoleRepo
+	deadLetterRepo DeadLetterRepo
+	tenantRepo     TenantRepo
 }
 
 func NewRepo(db *gorm.DB, logger *zap.Logger) Repo {

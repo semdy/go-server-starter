@@ -22,18 +22,18 @@ type Service interface {
 }
 
 type ServiceImpl struct {
-	db                  *gorm.DB
-	config              *config.Config
-	jwt                 *jwt.JWT
-	redis               *redis.Client
-	snowflake           *snowflake.Snowflake
-	logger              *zap.Logger
-	userService         UserService
-	userRoleService     UserRoleService
-	authService         AuthService
-	verifyCodeService   VerifyCodeService
-	deadLetterService   DeadLetterService
-	tenantService       TenantService
+	db                *gorm.DB
+	config            *config.Config
+	jwt               *jwt.JWT
+	redis             *redis.Client
+	snowflake         *snowflake.Snowflake
+	logger            *zap.Logger
+	userService       UserService
+	userRoleService   UserRoleService
+	authService       AuthService
+	verifyCodeService VerifyCodeService
+	deadLetterService DeadLetterService
+	tenantService     TenantService
 }
 
 func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, taskqClient *taskq.Client, logger *zap.Logger) Service {
