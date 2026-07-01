@@ -1511,6 +1511,9 @@ const docTemplate = `{
         "go-server-starter_internal_dto.TenantResDto": {
             "type": "object",
             "properties": {
+                "active": {
+                    "type": "boolean"
+                },
                 "code": {
                     "type": "string"
                 },
@@ -1523,9 +1526,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "status": {
-                    "type": "string"
-                },
                 "updatedAt": {
                     "type": "string"
                 }
@@ -1534,23 +1534,22 @@ const docTemplate = `{
         "go-server-starter_internal_dto.TenantUpdateReqDto": {
             "type": "object",
             "properties": {
+                "active": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string",
                     "maxLength": 100,
                     "minLength": 2
-                },
-                "status": {
-                    "type": "string",
-                    "enum": [
-                        "active",
-                        "disabled"
-                    ]
                 }
             }
         },
         "go-server-starter_internal_dto.UserInfoResDto": {
             "type": "object",
             "properties": {
+                "active": {
+                    "type": "boolean"
+                },
                 "avatarURL": {
                     "type": "string"
                 },
@@ -1583,6 +1582,9 @@ const docTemplate = `{
         "go-server-starter_internal_dto.UserListItemResDto": {
             "type": "object",
             "properties": {
+                "active": {
+                    "type": "boolean"
+                },
                 "avatarURL": {
                     "type": "string"
                 },
@@ -1669,10 +1671,10 @@ const docTemplate = `{
         },
         "go-server-starter_internal_dto.UserUpdateInfoReqDto": {
             "type": "object",
-            "required": [
-                "nickname"
-            ],
             "properties": {
+                "active": {
+                    "type": "boolean"
+                },
                 "avatarURL": {
                     "type": "string"
                 },

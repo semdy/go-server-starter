@@ -169,6 +169,8 @@ definitions:
     type: object
   go-server-starter_internal_dto.TenantResDto:
     properties:
+      active:
+        type: boolean
       code:
         type: string
       createdAt:
@@ -177,25 +179,22 @@ definitions:
         type: integer
       name:
         type: string
-      status:
-        type: string
       updatedAt:
         type: string
     type: object
   go-server-starter_internal_dto.TenantUpdateReqDto:
     properties:
+      active:
+        type: boolean
       name:
         maxLength: 100
         minLength: 2
         type: string
-      status:
-        enum:
-        - active
-        - disabled
-        type: string
     type: object
   go-server-starter_internal_dto.UserInfoResDto:
     properties:
+      active:
+        type: boolean
       avatarURL:
         type: string
       countryCode:
@@ -217,6 +216,8 @@ definitions:
     type: object
   go-server-starter_internal_dto.UserListItemResDto:
     properties:
+      active:
+        type: boolean
       avatarURL:
         type: string
       countryCode:
@@ -275,6 +276,8 @@ definitions:
     type: object
   go-server-starter_internal_dto.UserUpdateInfoReqDto:
     properties:
+      active:
+        type: boolean
       avatarURL:
         type: string
       desc:
@@ -284,8 +287,6 @@ definitions:
         maxLength: 20
         minLength: 2
         type: string
-    required:
-    - nickname
     type: object
 host: localhost:8080
 info:
