@@ -32,20 +32,20 @@ import (
 )
 
 type App struct {
-	config     *config.Config
-	engine     *gin.Engine
-	server     *http.Server
-	db         *database.DB
-	redis      *redis.Client
-	logger     *zap.Logger
-	snowflake  *snowflake.Snowflake
-	translator *translator.Translator
-	ratelimit  *middleware.RateLimit
-	jwt        *jwt.JWT
-	auth       auth.Auth
-	handler    handler.Handler
-	repo       repo.Repo
-	service    service.Service
+	config      *config.Config
+	engine      *gin.Engine
+	server      *http.Server
+	db          *database.DB
+	redis       *redis.Client
+	logger      *zap.Logger
+	snowflake   *snowflake.Snowflake
+	translator  *translator.Translator
+	ratelimit   *middleware.RateLimit
+	jwt         *jwt.JWT
+	auth        auth.Auth
+	handler     handler.Handler
+	repo        repo.Repo
+	service     service.Service
 	seed        seed.Seed
 	taskqClient *taskq.Client
 	taskqServer *taskq.Server
@@ -181,6 +181,7 @@ func (a *App) Start() error {
 			a.logger.Error("taskq worker stopped with error", zap.Error(err))
 		}
 	}()
+
 	a.taskqServer = taskqServer
 
 	// snowflake
@@ -191,7 +192,9 @@ func (a *App) Start() error {
 	a.snowflake = snowflake
 
 	// 注入 Snowflake ID 生成器，所有 GORM Create 自动使用
-	model.GenerateID = func() uint64 { return uint64(snowflake.GenerateID()) }
+	model.GenerateID = func() uint64 {
+		return uint64(snowflake.GenerateID())
+	}
 
 	// 初始化repo
 	a.repo = repo.NewRepo(
