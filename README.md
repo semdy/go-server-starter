@@ -260,6 +260,36 @@ curl -H "Accept-Language: en" http://localhost:8080/api/hello
 curl -H "Accept-Language: zh" http://localhost:8080/api/hello
 ```
 
+## 🚦 Rate Limiting
+
+Redis-backed GCRA algorithm with local fallback when Redis is unavailable.
+
+### Two modes
+
+| Mode | Key | Use |
+|------|-----|-----|
+| `RateLimit` | IP address | Unauthenticated endpoints (login, send-code) |
+| `RateLimitByUser` | User ID from JWT | Authenticated endpoints |
+
+### Per-route thresholds
+
+| Group | Limit | Key type |
+|-------|-------|----------|
+| `/auth/*` (login, send-code) | 10/min | IP |
+| `/user/my-info` | 60/min | User |
+| `/user/admin/*` | 120/min | User |
+| `/role/*` | 120/min | User |
+| `/admin/dead-letters/*` | 60/min | User |
+| `/admin/tenants/*` | 60/min | User |
+
+```go
+// Apply in route setup
+router.Use(r.ratelimit.RateLimit(10, "AUTH"))        // IP-based
+router.Use(r.ratelimit.RateLimitByUser(60, "USER"))  // User-based
+```
+
+Rate limit headers (`X-RateLimit-*-Remaining`, `Retry-After`) are included in responses.
+
 ## 📝 Logging
 
 Logs are structured with Zap and automatically rotated:

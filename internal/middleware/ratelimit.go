@@ -20,7 +20,6 @@ type RateLimit struct {
 	redis  *redis.Client
 	logger *zap.Logger
 
-	// local fallback when Redis is down
 	mu          sync.Mutex
 	localCounts map[string]*localWindow
 }
@@ -36,7 +35,6 @@ func NewRateLimit(redis *redis.Client, logger *zap.Logger) *RateLimit {
 		logger:      logger,
 		localCounts: make(map[string]*localWindow),
 	}
-	// Periodically purge stale local counters
 	go rl.purgeLoop()
 	return rl
 }
@@ -58,48 +56,74 @@ func (r *RateLimit) purgeStale() {
 	}
 }
 
-// RateLimit 限流中间件（每分钟限流 rate 次，Redis GCRA + 本地降级）
-func (r *RateLimit) RateLimit(rate int, zones ...string) gin.HandlerFunc {
+// RateLimitByUser limits by authenticated user ID (uniCode from JWT). Falls back to IP.
+func (r *RateLimit) RateLimitByUser(rate int, zones ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		appCtx := ctx.FromGinCtx(c)
-		ip := c.ClientIP()
-
-		if len(zones) == 0 {
-			zones = []string{"GLOBAL"}
-		}
-		zoneStr := strings.ToUpper(strings.Join(zones, ":"))
-		key := constant.RedisKeyOfRateLimit(zoneStr, ip)
-
-		limiter := redis_rate.NewLimiter(r.redis)
-		res, err := limiter.Allow(appCtx.Ctx, key, redis_rate.PerMinute(rate))
-		if err != nil {
-			// Redis unreachable — fall back to local sliding window
-			r.logger.Warn("redis rate limit failed, using local fallback", zap.Error(err))
-			if !r.localAllow(key, rate) {
-				appCtx.ToError(exception.TooManyRequests)
-				return
-			}
-			c.Next()
-			return
-		}
-
-		headerKey := fmt.Sprintf("X-RateLimit-%s-Remaining", zoneStr)
-		c.Header(headerKey, strconv.FormatInt(int64(res.Remaining), 10))
-
-		if res.Allowed == 0 {
-			c.Header("Retry-After", strconv.FormatFloat(res.RetryAfter.Seconds(), 'f', 0, 64))
-			appCtx.ToError(exception.TooManyRequests)
+		key := userKey(c, zones)
+		if !r.check(appCtx, key, rate, zones) {
 			return
 		}
 		c.Next()
 	}
 }
 
-// localAllow implements a simple per-minute sliding window in memory.
+// RateLimit limits by IP address.
+func (r *RateLimit) RateLimit(rate int, zones ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		appCtx := ctx.FromGinCtx(c)
+		key := ipKey(c, zones)
+		if !r.check(appCtx, key, rate, zones) {
+			return
+		}
+		c.Next()
+	}
+}
+
+func ipKey(c *gin.Context, zones []string) string {
+	return fmt.Sprintf("ip:%s", constant.RedisKeyOfRateLimit(zoneStr(zones), c.ClientIP()))
+}
+
+func userKey(c *gin.Context, zones []string) string {
+	if uniCode := c.GetString(constant.CTX_KEY_OF_USER_UNI_CODE); uniCode != "" {
+		return fmt.Sprintf("user:%s", constant.RedisKeyOfRateLimit(zoneStr(zones), uniCode))
+	}
+	return ipKey(c, zones) // fallback to IP before JWT middleware runs
+}
+
+func zoneStr(zones []string) string {
+	if len(zones) == 0 {
+		return "GLOBAL"
+	}
+	return strings.ToUpper(strings.Join(zones, ":"))
+}
+
+func (r *RateLimit) check(appCtx *ctx.Context, key string, rate int, zones []string) bool {
+	limiter := redis_rate.NewLimiter(r.redis)
+	res, err := limiter.Allow(appCtx.Ctx, key, redis_rate.PerMinute(rate))
+	if err != nil {
+		r.logger.Warn("redis rate limit failed, using local fallback", zap.Error(err))
+		if !r.localAllow(key, rate) {
+			appCtx.ToError(exception.TooManyRequests)
+			return false
+		}
+		return true
+	}
+
+	headerKey := fmt.Sprintf("X-RateLimit-%s-Remaining", zoneStr(zones))
+	appCtx.Gtx.Header(headerKey, strconv.FormatInt(int64(res.Remaining), 10))
+
+	if res.Allowed == 0 {
+		appCtx.Gtx.Header("Retry-After", strconv.FormatFloat(res.RetryAfter.Seconds(), 'f', 0, 64))
+		appCtx.ToError(exception.TooManyRequests)
+		return false
+	}
+	return true
+}
+
 func (r *RateLimit) localAllow(key string, rate int) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
 	now := time.Now()
 	w, exists := r.localCounts[key]
 	if !exists || now.Sub(w.started) > time.Minute {

@@ -241,8 +241,8 @@ func (a *App) Start() error {
 	)
 	// 初始化ratelimit
 	a.ratelimit = middleware.NewRateLimit(a.redis, a.logger.Named("RATELIMIT"))
-	// 每分钟限流 100 次
-	a.engine.Use(a.ratelimit.RateLimit(100))
+	// 全局兜底限流（各路由组已有细粒度配置，按需开启）
+	// a.engine.Use(a.ratelimit.RateLimit(300))
 	// 初始化router
 	router := router.NewRouter(
 		a.handler,

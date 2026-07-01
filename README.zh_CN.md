@@ -260,6 +260,35 @@ curl -H "Accept-Language: en" http://localhost:8080/api/hello
 curl -H "Accept-Language: zh" http://localhost:8080/api/hello
 ```
 
+## 🚦 限流
+
+基于 Redis GCRA 算法，Redis 不可用时降级为本地滑动窗口。
+
+### 两种模式
+
+| 模式 | 限流 Key | 适用 |
+|------|---------|------|
+| `RateLimit` | IP 地址 | 非认证接口（登录、发送验证码） |
+| `RateLimitByUser` | JWT 中的用户 ID | 已认证接口 |
+
+### 各路由组阈值
+
+| 路由组 | 阈值 | Key 类型 |
+|--------|------|----------|
+| `/auth/*`（登录/验证码） | 10/min | IP |
+| `/user/my-info` | 60/min | User |
+| `/user/admin/*` | 120/min | User |
+| `/role/*` | 120/min | User |
+| `/admin/dead-letters/*` | 60/min | User |
+| `/admin/tenants/*` | 60/min | User |
+
+```go
+router.Use(r.ratelimit.RateLimit(10, "AUTH"))        // IP 限流
+router.Use(r.ratelimit.RateLimitByUser(60, "USER"))  // 用户限流
+```
+
+响应头包含 `X-RateLimit-*-Remaining` 和 `Retry-After`。
+
 ## 📝 日志系统
 
 日志使用 Zap 进行结构化记录，并自动轮转：
