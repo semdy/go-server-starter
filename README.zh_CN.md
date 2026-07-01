@@ -215,6 +215,7 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/auth/send-email-code` | 发送邮箱验证码 | 否 |
 | POST | `/api/auth/login/mobile` | 手机号 + 验证码登录 | 否 |
 | POST | `/api/auth/login/email` | 邮箱 + 验证码登录 | 否 |
+| POST | `/api/auth/switch-tenant` | 切换到其他租户 | 是 |
 | GET | `/api/user/my-info` | 获取当前用户信息 | 是 |
 | PUT | `/api/user/my-info` | 更新当前用户信息 | 是 |
 | GET | `/api/user/admin/table` | 用户列表（分页） | admin+ |

@@ -615,6 +615,52 @@
                 }
             }
         },
+        "/auth/switch-tenant": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "切换到指定租户，签发新的 JWT token（旧 token 仍有效）。需已是目标租户成员。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "切换租户",
+                "parameters": [
+                    {
+                        "description": "租户 Code",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.SwitchTenantReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.AuthTokenResDto"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/healthz": {
             "get": {
                 "description": "返回服务及依赖（DB、Redis）的健康状态",
@@ -1479,6 +1525,17 @@
                     "type": "string"
                 },
                 "mobile": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.SwitchTenantReqDto": {
+            "type": "object",
+            "required": [
+                "tenantCode"
+            ],
+            "properties": {
+                "tenantCode": {
                     "type": "string"
                 }
             }

@@ -215,6 +215,7 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/auth/send-email-code` | Send email verification code | No |
 | POST | `/api/auth/login/mobile` | Login via mobile + code | No |
 | POST | `/api/auth/login/email` | Login via email + code | No |
+| POST | `/api/auth/switch-tenant` | Switch to another tenant | Yes |
 | GET | `/api/user/my-info` | Get current user info | Yes |
 | PUT | `/api/user/my-info` | Update current user info | Yes |
 | GET | `/api/user/admin/table` | List users (paginated) | admin+ |

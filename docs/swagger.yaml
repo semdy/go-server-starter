@@ -153,6 +153,13 @@ definitions:
     - countryCode
     - mobile
     type: object
+  go-server-starter_internal_dto.SwitchTenantReqDto:
+    properties:
+      tenantCode:
+        type: string
+    required:
+    - tenantCode
+    type: object
   go-server-starter_internal_dto.TenantCreateReqDto:
     properties:
       code:
@@ -682,6 +689,35 @@ paths:
             additionalProperties: true
             type: object
       summary: 发送短信验证码
+      tags:
+      - auth
+  /auth/switch-tenant:
+    post:
+      consumes:
+      - application/json
+      description: 切换到指定租户，签发新的 JWT token（旧 token 仍有效）。需已是目标租户成员。
+      parameters:
+      - description: 租户 Code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.SwitchTenantReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.AuthTokenResDto'
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 切换租户
       tags:
       - auth
   /healthz:
