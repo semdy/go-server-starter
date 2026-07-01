@@ -15,6 +15,7 @@ type AuthHandler interface {
 	LoginByEmailAndCode(c *gin.Context)
 	SendSmsCode(c *gin.Context)
 	SendEmailCode(c *gin.Context)
+	SwitchTenant(c *gin.Context)
 }
 
 type AuthHandlerImpl struct {
@@ -135,4 +136,35 @@ func (h *AuthHandlerImpl) SendEmailCode(c *gin.Context) {
 		return
 	}
 	appCtx.ToSuccess(nil)
+}
+
+// SwitchTenant godoc
+// @Summary      切换租户
+// @Description  切换到指定租户，签发新的 JWT token（旧 token 仍有效）。需已是目标租户成员。
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        body  body      dto.SwitchTenantReqDto  true  "租户 Code"
+// @Success      200   {object}  dto.AuthTokenResDto
+// @Failure      403   {object}  map[string]interface{}
+// @Router       /auth/switch-tenant [post]
+func (h *AuthHandlerImpl) SwitchTenant(c *gin.Context) {
+	var appCtx = ctx.FromGinCtx(c)
+	uniCode, err := appCtx.GetUserUniCode()
+	if err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	var params dto.SwitchTenantReqDto
+	if err := appCtx.ShouldBind(&params); err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	res, err := h.service.Auth().SwitchTenant(appCtx.Ctx, uniCode, params)
+	if err != nil {
+		appCtx.ToError(err)
+		return
+	}
+	appCtx.ToSuccess(res)
 }

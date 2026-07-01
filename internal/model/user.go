@@ -14,6 +14,7 @@ type User struct {
 	Nickname    string     `json:"nickname"`
 	AvatarURL   string     `json:"avatarURL"`
 	Roles       []UserRole `gorm:"many2many:user_role_refs;constraint:OnDelete:CASCADE" json:"roles"`
+	Tenants     []Tenant   `gorm:"many2many:user_tenant_refs;constraint:OnDelete:CASCADE" json:"tenants,omitempty"`
 }
 
 func (User) TableName() string {

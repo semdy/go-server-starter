@@ -20,6 +20,7 @@ import (
 type AuthService interface {
 	LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 	LoginByEmailAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
+	SwitchTenant(ctx context.Context, uniCode string, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 }
 
 type AuthServiceImpl struct {
@@ -30,12 +31,7 @@ type AuthServiceImpl struct {
 }
 
 func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, logger *zap.Logger) AuthService {
-	return &AuthServiceImpl{
-		repo:   repo,
-		jwt:    jwt,
-		taskq:  taskq,
-		logger: logger,
-	}
+	return &AuthServiceImpl{repo: repo, jwt: jwt, taskq: taskq, logger: logger}
 }
 
 // loginOrRegister looks up a user, returns their tenant_id from DB, or auto-generates one for new users.
@@ -157,3 +153,27 @@ func (s *AuthServiceImpl) LoginByEmailAndCode(ctx context.Context, deviceType en
 	)
 }
 
+func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
+	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.UserNotFound
+		}
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+
+	tenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", params.TenantCode))
+	if tenantErr != nil || tenant == nil || !tenant.Active {
+		return nil, exception.Forbidden.Append("tenant not found or disabled")
+	}
+
+	if user.TenantID != params.TenantCode {
+		return nil, exception.Forbidden.Append("user is not a member of this tenant")
+	}
+
+	token, tokenErr := s.jwt.GenerateToken(user.UniCode, params.TenantCode, enum.DeviceTypeWeb)
+	if tokenErr != nil {
+		return nil, exception.InternalServerError.Append(tokenErr.Error())
+	}
+	return &dto.AuthTokenResDto{Token: token}, nil
+}
