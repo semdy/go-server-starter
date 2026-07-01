@@ -20,10 +20,14 @@ type Model struct {
 	Version   optimisticlock.Version `json:"version"`              // 乐观锁
 }
 
-// BeforeCreate auto-fills Snowflake ID when the caller hasn't set one.
+// BeforeCreate auto-fills Snowflake ID. Tables listed in autoIncrementTables use MySQL AUTO_INCREMENT instead.
+var autoIncrementTables = map[string]bool{"user_roles": true}
+
 func (m *Model) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == 0 && GenerateID != nil {
-		m.ID = GenerateID()
+		if tx.Statement.Schema == nil || !autoIncrementTables[tx.Statement.Schema.Table] {
+			m.ID = GenerateID()
+		}
 	}
 	return nil
 }
