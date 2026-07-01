@@ -27,13 +27,14 @@ type TenantService interface {
 }
 
 type TenantServiceImpl struct {
-	repo      repo.Repo
-	snowflake *snowflake.Snowflake
-	logger    *zap.Logger
+	repo        repo.Repo
+	snowflake   *snowflake.Snowflake
+	roleService UserRoleService
+	logger      *zap.Logger
 }
 
-func NewTenantService(repo repo.Repo, sf *snowflake.Snowflake, logger *zap.Logger) TenantService {
-	return &TenantServiceImpl{repo: repo, snowflake: sf, logger: logger}
+func NewTenantService(repo repo.Repo, sf *snowflake.Snowflake, roleService UserRoleService, logger *zap.Logger) TenantService {
+	return &TenantServiceImpl{repo: repo, snowflake: sf, roleService: roleService, logger: logger}
 }
 
 func toTenantResDto(t *model.Tenant) *dto.TenantResDto {
@@ -41,7 +42,7 @@ func toTenantResDto(t *model.Tenant) *dto.TenantResDto {
 		ID:        t.ID,
 		Name:      t.Name,
 		Code:      t.Code,
-		Status:    t.Status,
+		Active:    t.Active,
 		CreatedAt: t.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: t.UpdatedAt.Format(time.RFC3339),
 	}
@@ -65,7 +66,7 @@ func (s *TenantServiceImpl) GetByID(ctx context.Context, id uint64) (*dto.Tenant
 func (s *TenantServiceImpl) GetTable(ctx context.Context, params dto.TenantTableQueryReqDto) (*dto.PaginationResDto[[]*dto.TenantResDto], *exception.Exception) {
 	opts := []repo.QueryOption{
 		repo.Order("id ASC"),
-		repo.WherePtrNonEmpty("status = ?", params.Status),
+		repo.WherePtrNonEmpty("active = ?", params.Active),
 	}
 	entries, total, err := s.repo.Tenant().GetTable(ctx, params.Page, params.PageSize, opts...)
 	if err != nil {
@@ -105,11 +106,15 @@ func (s *TenantServiceImpl) Update(ctx context.Context, id uint64, params dto.Te
 	if params.Name != nil {
 		t.Name = *params.Name
 	}
-	if params.Status != nil {
-		t.Status = *params.Status
+	if params.Active != nil {
+		t.Active = *params.Active
 	}
 	if err := s.repo.Tenant().UpdateByZeroFields(ctx, id, t); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	// If deactivated, invalidate all role caches so affected users are blocked immediately
+	if params.Active != nil && !*params.Active && s.roleService != nil {
+		s.roleService.InvalidateAllRoleCaches(ctx)
 	}
 	return toTenantResDto(t), nil
 }
@@ -118,5 +123,6 @@ func (s *TenantServiceImpl) Delete(ctx context.Context, id uint64) *exception.Ex
 	if err := s.repo.Tenant().SoftDelete(ctx, id); err != nil {
 		return nil
 	}
+	s.roleService.InvalidateAllRoleCaches(ctx)
 	return nil
 }

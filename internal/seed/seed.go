@@ -43,7 +43,7 @@ func (s *seed) SeedDefaultTenant() error {
 	if existing != nil {
 		return nil
 	}
-	t := &model.Tenant{Name: "Default", Code: "default", Status: "active"}
+	t := &model.Tenant{Name: "Default", Code: "default", Active: true}
 	if err := s.repo.Tenant().Create(ctx, t); err != nil {
 		return err
 	}

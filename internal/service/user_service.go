@@ -29,14 +29,16 @@ type UserService interface {
 }
 
 type UserServiceImpl struct {
-	repo   repo.Repo
-	logger *zap.Logger
+	repo        repo.Repo
+	roleService UserRoleService
+	logger      *zap.Logger
 }
 
-func NewUserService(repo repo.Repo, redis *redis.Client, logger *zap.Logger) UserService {
+func NewUserService(repo repo.Repo, redis *redis.Client, roleService UserRoleService, logger *zap.Logger) UserService {
 	return &UserServiceImpl{
-		repo:   repo,
-		logger: logger,
+		repo:        repo,
+		roleService: roleService,
+		logger:      logger,
 	}
 }
 
@@ -99,6 +101,7 @@ func (s *UserServiceImpl) GetTable(ctx context.Context, params dto.UserTableQuer
 			ID:          user.ID,
 			CreatedAt:   user.CreatedAt.Format(time.RFC3339),
 			UniCode:     user.UniCode,
+			Active:      user.Active,
 			Email:       user.Email,
 			Mobile:      user.Mobile,
 			CountryCode: user.CountryCode,
@@ -154,6 +157,7 @@ func userToInfoDto(user *model.User) *dto.UserInfoResDto {
 	}
 	return &dto.UserInfoResDto{
 		UniCode:     user.UniCode,
+		Active:      user.Active,
 		Email:       user.Email,
 		Mobile:      user.Mobile,
 		CountryCode: user.CountryCode,
@@ -177,7 +181,7 @@ func (s *UserServiceImpl) UserCreate(ctx context.Context, params dto.CreateUserR
 		return nil, exception.BadRequest.Append("email already exists in this tenant")
 	}
 	uniCode, _ := s.repo.User().GenerateUniCode(ctx)
-	user := &model.User{TenantID: tid, UniCode: uniCode, Email: params.Email, Nickname: params.Nickname}
+	user := &model.User{TenantID: tid, UniCode: uniCode, Active: true, Email: params.Email, Nickname: params.Nickname}
 	if err := s.repo.User().Create(ctx, user); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -204,6 +208,10 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 	}
 	if err := s.repo.User().UpdateByZeroFields(ctx, id, user); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	// Invalidate role cache so disabled users take effect immediately
+	if !user.Active && s.roleService != nil {
+		s.roleService.DeleteRoleCache(ctx, user.UniCode)
 	}
 	return userToInfoDto(user), nil
 }

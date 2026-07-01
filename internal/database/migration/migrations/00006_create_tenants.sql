@@ -7,9 +7,9 @@ CREATE TABLE tenants (
     version BIGINT UNSIGNED DEFAULT 0,
     name VARCHAR(100) NOT NULL,
     code VARCHAR(64) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    active TINYINT(1) NOT NULL DEFAULT 1,
     UNIQUE INDEX idx_tenant_code (code),
-    INDEX idx_tenant_status (status),
+    INDEX idx_tenant_active (active),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

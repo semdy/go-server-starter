@@ -28,6 +28,8 @@ type UserRoleService interface {
 	Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Delete(ctx context.Context, id uint64) *exception.Exception
+	InvalidateAllRoleCaches(ctx context.Context)
+	DeleteRoleCache(ctx context.Context, uniCode string)
 }
 
 type UserRoleServiceImpl struct {
@@ -46,14 +48,33 @@ func NewUserRoleService(repo repo.Repo, redis *redis.Client, logger *zap.Logger)
 }
 
 func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
-	roles, err := s.repo.User().GetRolesByUniCode(ctx, uniCode)
+	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
 	if err != nil {
-		s.logger.Error("get roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.Unauthorized.Append("user not found or disabled")
+		}
+		s.logger.Error("get user by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	rolesCode := make([]enum.RoleCode, len(roles))
-	for i, role := range roles {
-		rolesCode[i] = role.Code
+
+	if !user.Active {
+		return nil, exception.Unauthorized.Append("user is disabled")
+	}
+
+	// Check tenant is active
+	tenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", user.TenantID))
+	if tenantErr != nil && !errors.Is(tenantErr, gorm.ErrRecordNotFound) {
+		return nil, exception.InternalServerError.Append(tenantErr.Error())
+	}
+	if tenant == nil || !tenant.Active {
+		return nil, exception.Unauthorized.Append("tenant is disabled or deleted")
+	}
+
+	rolesCode := make([]enum.RoleCode, len(user.Roles))
+	for i, role := range user.Roles {
+		if role.Enabled {
+			rolesCode[i] = role.Code
+		}
 	}
 	return rolesCode, nil
 }
@@ -110,9 +131,15 @@ func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, u
 	return result.([]enum.RoleCode), nil
 }
 
-// invalidateAllRoleCaches removes all role cache entries from Redis.
-// Called after any role mutation (create/update/delete) to prevent stale cache reads.
-func (s *UserRoleServiceImpl) invalidateAllRoleCaches(ctx context.Context) {
+func (s *UserRoleServiceImpl) DeleteRoleCache(ctx context.Context, uniCode string) {
+	key := constant.RedisKeyOfAuthRoles(uniCode)
+	if err := s.redis.Del(ctx, key).Err(); err != nil {
+		s.logger.Warn("failed to delete role cache", zap.String("uniCode", uniCode), zap.Error(err))
+	}
+}
+
+// InvalidateAllRoleCaches removes all role cache entries from Redis.
+func (s *UserRoleServiceImpl) InvalidateAllRoleCaches(ctx context.Context) {
 	pattern := "auth:roles:*"
 	var cursor uint64
 	var totalDeleted int64
@@ -206,7 +233,7 @@ func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCre
 	}
 
 	// Invalidate role caches so any cached role lists reflect the new role
-	s.invalidateAllRoleCaches(ctx)
+	s.InvalidateAllRoleCaches(ctx)
 
 	return toUserRoleResDto(role), nil
 }
@@ -236,7 +263,7 @@ func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.
 	}
 
 	// Invalidate caches — role code or enabled status may have changed
-	s.invalidateAllRoleCaches(ctx)
+	s.InvalidateAllRoleCaches(ctx)
 
 	return toUserRoleResDto(role), nil
 }
@@ -247,7 +274,7 @@ func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.
 	}
 
 	// Invalidate caches — deleted role should no longer appear in user role lists
-	s.invalidateAllRoleCaches(ctx)
+	s.InvalidateAllRoleCaches(ctx)
 
 	return nil
 }

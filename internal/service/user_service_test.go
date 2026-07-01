@@ -74,7 +74,8 @@ func sampleUser() *model.User {
 func newTestUserService(userRepo repo.UserRepo) UserService {
 	return NewUserService(
 		&testRepo{userRepo: userRepo, userRoleRepo: &stubUserRoleRepo{}},
-		nil, // redis not needed for these tests
+		nil, // redis
+		nil, // roleService
 		zap.NewNop(),
 	)
 }

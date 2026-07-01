@@ -4,6 +4,7 @@ type User struct {
 	Model
 	TenantID    string     `json:"tenantId"`
 	UniCode     string     `json:"uniCode"`
+	Active      bool       `json:"active"`
 	Email       string     `json:"email"`
 	Mobile      string     `json:"mobile"`
 	CountryCode string     `json:"countryCode"`

@@ -6,20 +6,20 @@ type TenantCreateReqDto struct {
 }
 
 type TenantUpdateReqDto struct {
-	Name   *string `json:"name" binding:"omitempty,min=2,max=100"`
-	Status *string `json:"status" binding:"omitempty,oneof=active disabled"`
+	Name   *string `json:"name"   binding:"omitempty,min=2,max=100"`
+	Active *bool   `json:"active" binding:"omitempty"`
 }
 
 type TenantResDto struct {
 	ID        uint64 `json:"id"`
 	Name      string `json:"name"`
 	Code      string `json:"code"`
-	Status    string `json:"status"`
+	Active    bool   `json:"active"`
 	CreatedAt string `json:"createdAt"`
 	UpdatedAt string `json:"updatedAt"`
 }
 
 type TenantTableQueryReqDto struct {
 	PaginationReqDto
-	Status *string `json:"status" form:"status"`
+	Active *bool `json:"active" form:"active"`
 }

@@ -37,6 +37,7 @@ type ServiceImpl struct {
 }
 
 func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, taskqClient *taskq.Client, logger *zap.Logger) Service {
+	userRoleService := NewUserRoleService(repo, redis, logger)
 	return &ServiceImpl{
 		db:                db,
 		config:            config,
@@ -44,12 +45,12 @@ func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.C
 		redis:             redis,
 		snowflake:         snowflake,
 		logger:            logger,
-		userService:       NewUserService(repo, redis, logger),
-		userRoleService:   NewUserRoleService(repo, redis, logger),
+		userService:       NewUserService(repo, redis, userRoleService, logger),
+		userRoleService:   userRoleService,
 		authService:       NewAuthService(repo, jwt, taskqClient, logger),
 		verifyCodeService: NewVerifyCodeService(redis.Client, taskqClient, logger),
 		deadLetterService: NewDeadLetterService(repo, taskqClient, logger),
-		tenantService:     NewTenantService(repo, snowflake, logger),
+		tenantService:     NewTenantService(repo, snowflake, userRoleService, logger),
 	}
 }
 

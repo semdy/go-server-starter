@@ -50,6 +50,17 @@ func (s *AuthServiceImpl) loginOrRegister(
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 
+	if user != nil {
+		if !user.Active {
+			return nil, exception.Forbidden.Append("user is disabled")
+		}
+		// Verify tenant is active
+		tenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", user.TenantID))
+		if tenantErr != nil || tenant == nil || !tenant.Active {
+			return nil, exception.Forbidden.Append("tenant is disabled or deleted")
+		}
+	}
+
 	if user == nil {
 		tx := s.repo.DB().Begin()
 		userRepo := s.repo.User().WithTx(tx)

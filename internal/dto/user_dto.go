@@ -1,13 +1,15 @@
 package dto
 
 type UserUpdateInfoReqDto struct {
-	Nickname  *string `json:"nickname" form:"nickname" binding:"required,min=2,max=20"`
+	Nickname  *string `json:"nickname" form:"nickname" binding:"omitempty,min=2,max=20"`
 	AvatarURL *string `json:"avatarURL" form:"avatarURL" binding:"omitempty,url"`
 	Desc      *string `json:"desc" form:"desc" binding:"omitempty,max=200"`
+	Active    *bool   `json:"active" form:"active"`
 }
 
 type UserInfoResDto struct {
 	UniCode     string   `json:"uniCode"`
+	Active      bool     `json:"active"`
 	Email       string   `json:"email"`
 	Mobile      string   `json:"mobile"`
 	CountryCode string   `json:"countryCode"`
@@ -29,6 +31,7 @@ type UserListItemResDto struct {
 	ID          uint64   `json:"id"`
 	CreatedAt   string   `json:"createdAt"`
 	UniCode     string   `json:"uniCode"`
+	Active      bool     `json:"active"`
 	Email       string   `json:"email"`
 	Mobile      string   `json:"mobile"`
 	CountryCode string   `json:"countryCode"`
