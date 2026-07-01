@@ -517,6 +517,14 @@ For development with hot reload, use [Air](https://github.com/cosmtrek/air):
 air
 ```
 
+### Install Dev Tools
+
+```bash
+make install   # installs go-enum + swag CLI (one-time)
+make enum      # regenerate enum code from // ENUM(...) comments
+make swagger   # regenerate API docs from handler annotations
+```
+
 ### With Docker
 
   1. startup docker compose

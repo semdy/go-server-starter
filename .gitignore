@@ -12,3 +12,4 @@ logs/
 
 # Build artifacts
 tmp/
+bin/

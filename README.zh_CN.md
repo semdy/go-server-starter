@@ -516,6 +516,14 @@ internal/database/migration/migrations/xxx.sql # goose 迁移
 air
 ```
 
+### 安装开发工具
+
+```bash
+make install   # 安装 go-enum + swag CLI（一次性）
+make enum      # 从 // ENUM(...) 注释重新生成枚举代码
+make swagger   # 从 handler 注解重新生成 API 文档
+```
+
 ### 日常开发流程
 
   1. 启动依赖服务
