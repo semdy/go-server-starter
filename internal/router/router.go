@@ -48,5 +48,7 @@ func (r *Router) SetupRoutes() {
 	r.SetupTenantRoutes()
 
 	// Swagger API 文档
-	r.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	r.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		func(c *ginSwagger.Config) { c.PersistAuthorization = true },
+	))
 }

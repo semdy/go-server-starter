@@ -91,6 +91,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 
 		user = newUser(uniCode)
 		user.TenantID = "default"
+		user.Active = true
 		user.Roles = []model.UserRole{*role}
 
 		if err := userRepo.Create(ctx, user); err != nil {
