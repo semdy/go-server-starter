@@ -1,4 +1,8 @@
 {
+  "editor.formatOnSave": true,
+  "[go]": {
+    "editor.defaultFormatter": "golang.go"
+  },
   "cSpell.words": [
     "Asyn",
     "goredis",
