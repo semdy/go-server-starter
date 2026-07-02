@@ -641,7 +641,7 @@ const docTemplate = `{
                 "summary": "切换租户",
                 "parameters": [
                     {
-                        "description": "租户 Code",
+                        "description": "租户 ID",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1538,11 +1538,11 @@ const docTemplate = `{
         "go-server-starter_internal_dto.SwitchTenantReqDto": {
             "type": "object",
             "required": [
-                "tenantCode"
+                "tenantId"
             ],
             "properties": {
-                "tenantCode": {
-                    "type": "string"
+                "tenantId": {
+                    "type": "integer"
                 }
             }
         },

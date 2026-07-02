@@ -168,7 +168,7 @@ func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, para
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 
-	tenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", params.TenantCode))
+	tenant, tenantErr := s.repo.Tenant().GetByID(ctx, params.TenantID)
 	if tenantErr != nil || tenant == nil || !tenant.Active {
 		return nil, exception.Forbidden.Append("tenant not found or disabled")
 	}

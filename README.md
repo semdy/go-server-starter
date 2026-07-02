@@ -471,6 +471,8 @@ Generate a full CRUD module (model + repo + dto + service + handler + route + mi
 
 ```bash
 ./generate.sh product
+# or via Makefile
+make generate MODULE=product
 ```
 
 Output:

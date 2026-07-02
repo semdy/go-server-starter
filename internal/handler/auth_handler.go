@@ -145,7 +145,7 @@ func (h *AuthHandlerImpl) SendEmailCode(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     BearerAuth
-// @Param        body  body      dto.SwitchTenantReqDto  true  "租户 Code"
+// @Param        body  body      dto.SwitchTenantReqDto  true  "租户 ID"
 // @Success      200   {object}  dto.AuthTokenResDto
 // @Failure      403   {object}  map[string]interface{}
 // @Router       /auth/switch-tenant [post]

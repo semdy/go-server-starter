@@ -470,6 +470,8 @@ a.cronSched.Stop()  // 等待正在执行的任务完成
 
 ```bash
 ./generate.sh product
+# 或通过 Makefile
+make generate MODULE=product
 ```
 
 生成产物：

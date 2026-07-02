@@ -17,5 +17,5 @@ type AuthTokenResDto struct {
 
 // SwitchTenantReqDto is the request body for switching to a different tenant.
 type SwitchTenantReqDto struct {
-	TenantCode string `json:"tenantCode" binding:"required"`
+	TenantID uint64 `json:"tenantId" binding:"required"`
 }

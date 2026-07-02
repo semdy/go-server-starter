@@ -155,10 +155,10 @@ definitions:
     type: object
   go-server-starter_internal_dto.SwitchTenantReqDto:
     properties:
-      tenantCode:
-        type: string
+      tenantId:
+        type: integer
     required:
-    - tenantCode
+    - tenantId
     type: object
   go-server-starter_internal_dto.TenantCreateReqDto:
     properties:
@@ -697,7 +697,7 @@ paths:
       - application/json
       description: 切换到指定租户，签发新的 JWT token（旧 token 仍有效）。需已是目标租户成员。
       parameters:
-      - description: 租户 Code
+      - description: 租户 ID
         in: body
         name: body
         required: true

@@ -6,6 +6,7 @@ CREATE TABLE users (
     deleted_at DATETIME(3) NULL,
     version BIGINT UNSIGNED DEFAULT 0,
     uni_code VARCHAR(64) NOT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
     tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
     email VARCHAR(255),
     mobile VARCHAR(32),
@@ -21,7 +22,8 @@ CREATE TABLE users (
     INDEX idx_nickname (nickname),
     UNIQUE INDEX idx_email_tenant (email, tenant_id),
     INDEX idx_tenant_id (tenant_id),
-    INDEX idx_deleted_at (deleted_at)
+    INDEX idx_deleted_at (deleted_at),
+    CONSTRAINT fk_user_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- +goose Down

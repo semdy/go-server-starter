@@ -1,4 +1,4 @@
-.PHONY: build run test swagger install enum
+.PHONY: build run test swagger install enum generate
 
 build:
 	CGO_ENABLED=0 go build -o ./bin/server ./cmd/server
@@ -18,3 +18,7 @@ install:
 
 enum:
 	go generate ./internal/enum/...
+
+generate:
+	@if [ -z "$(MODULE)" ]; then echo "Usage: make generate MODULE=product"; exit 1; fi
+	./generate.sh $(MODULE)

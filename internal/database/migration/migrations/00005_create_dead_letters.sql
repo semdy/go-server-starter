@@ -22,7 +22,8 @@ CREATE TABLE dead_letters (
     INDEX idx_failed_at (failed_at),
     INDEX idx_tenant_id (tenant_id),
     INDEX idx_is_retried (is_retried),
-    INDEX idx_deleted_at (deleted_at)
+    INDEX idx_deleted_at (deleted_at),
+    CONSTRAINT fk_dl_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- +goose Down
