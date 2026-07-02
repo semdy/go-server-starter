@@ -127,8 +127,12 @@ func (s *DeadLetterServiceImpl) Retry(ctx context.Context, id uint64) *exception
 	now := time.Now()
 	entry.IsRetried = true
 	entry.RetriedAt = &now
-	if err := s.repo.DeadLetter().UpdateByZeroFields(ctx, id, entry); err != nil {
+	rows, err := s.repo.DeadLetter().MarkRetriedByIDAndTenantOrSystem(ctx, id, cctx.GetTenantID(ctx), now)
+	if err != nil {
 		return exception.InternalServerError.Append(err.Error())
+	}
+	if rows == 0 {
+		return exception.Forbidden.Append("dead letter belongs to another tenant")
 	}
 
 	return nil
@@ -156,8 +160,13 @@ func (s *DeadLetterServiceImpl) RetryAll(ctx context.Context, taskType string) (
 		now := time.Now()
 		entry.IsRetried = true
 		entry.RetriedAt = &now
-		if err := s.repo.DeadLetter().UpdateByZeroFields(ctx, entry.ID, entry); err != nil {
+		rows, err := s.repo.DeadLetter().MarkRetriedByIDAndTenantOrSystem(ctx, entry.ID, cctx.GetTenantID(ctx), now)
+		if err != nil {
 			s.logger.Warn("failed to mark dead letter retried", zap.Uint64("id", entry.ID), zap.Error(err))
+			continue
+		}
+		if rows == 0 {
+			s.logger.Warn("dead letter no longer belongs to current tenant", zap.Uint64("id", entry.ID))
 			continue
 		}
 		count++
@@ -177,8 +186,12 @@ func (s *DeadLetterServiceImpl) Delete(ctx context.Context, id uint64) *exceptio
 	if entry.TenantID != nil && *entry.TenantID != cctx.GetTenantID(ctx) {
 		return exception.Forbidden.Append("dead letter belongs to another tenant")
 	}
-	if err := s.repo.DeadLetter().HardDelete(ctx, id); err != nil {
+	rows, err := s.repo.DeadLetter().HardDeleteByIDAndTenantOrSystem(ctx, id, cctx.GetTenantID(ctx))
+	if err != nil {
 		return exception.InternalServerError.Append(err.Error())
+	}
+	if rows == 0 {
+		return exception.Forbidden.Append("dead letter belongs to another tenant")
 	}
 	return nil
 }

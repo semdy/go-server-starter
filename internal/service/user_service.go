@@ -123,6 +123,7 @@ func (s *UserServiceImpl) GetInfoByID(ctx context.Context, id uint64) (*dto.User
 }
 
 func (s *UserServiceImpl) UpdateMyInfo(ctx context.Context, uniCode string, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
+	tid := cctx.GetTenantID(ctx)
 	user, err := s.repo.User().GetOne(ctx, repo.Where("uni_code = ?", uniCode), repo.Preload("Roles"), tenantFilter(ctx))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
@@ -140,7 +141,22 @@ func (s *UserServiceImpl) UpdateMyInfo(ctx context.Context, uniCode string, para
 	if params.Desc != nil {
 		user.Desc = *params.Desc
 	}
-	if err := s.repo.User().UpdateByZeroFields(ctx, user.ID, user); err != nil {
+
+	updates := map[string]any{}
+	if params.Nickname != nil {
+		updates["nickname"] = user.Nickname
+	}
+	if params.AvatarURL != nil {
+		updates["avatar_url"] = user.AvatarURL
+	}
+	if params.Desc != nil {
+		updates["desc"] = user.Desc
+	}
+	if len(updates) == 0 {
+		return userToInfoDto(user), nil
+	}
+	_, err = s.repo.User().UpdateByIDAndTenant(ctx, user.ID, tid, updates)
+	if err != nil {
 		return nil, exception.UserUpdateInfoFailed.Append(err.Error())
 	}
 	return userToInfoDto(user), nil
@@ -208,8 +224,25 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 	if params.Active != nil {
 		user.Active = *params.Active
 	}
-	if err := s.repo.User().UpdateByZeroFields(ctx, id, user); err != nil {
-		return nil, exception.InternalServerError.Append(err.Error())
+
+	updates := map[string]any{}
+	if params.Nickname != nil {
+		updates["nickname"] = user.Nickname
+	}
+	if params.AvatarURL != nil {
+		updates["avatar_url"] = user.AvatarURL
+	}
+	if params.Desc != nil {
+		updates["desc"] = user.Desc
+	}
+	if params.Active != nil {
+		updates["active"] = user.Active
+	}
+	if len(updates) > 0 {
+		_, err := s.repo.User().UpdateByIDAndTenant(ctx, id, tid, updates)
+		if err != nil {
+			return nil, exception.InternalServerError.Append(err.Error())
+		}
 	}
 	// Invalidate role cache so disabled users take effect immediately
 	if !user.Active && s.roleService != nil {
@@ -230,8 +263,12 @@ func (s *UserServiceImpl) UserDelete(ctx context.Context, id uint64) *exception.
 	if user == nil {
 		return exception.UserNotFound
 	}
-	if err := s.repo.User().SoftDelete(ctx, id); err != nil {
+	rows, err := s.repo.User().SoftDeleteByIDAndTenant(ctx, id, tid)
+	if err != nil {
 		return exception.InternalServerError.Append(err.Error())
+	}
+	if rows == 0 {
+		return exception.UserNotFound
 	}
 	if s.roleService != nil {
 		s.roleService.DeleteRoleCache(ctx, user.UniCode)
