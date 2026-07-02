@@ -21,4 +21,4 @@ COPY --from=builder /build/configs ./configs
 
 EXPOSE 8080
 
-CMD ["./server"]
+CMD ["./server", "-mode=prod"]

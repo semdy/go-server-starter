@@ -1,7 +1,10 @@
-.PHONY: build run test swagger install enum generate
+.PHONY: build run serve test swagger install enum generate
 
 build:
 	CGO_ENABLED=0 go build -o ./bin/server ./cmd/server
+
+serve: build
+	./bin/server -mode=prod
 
 run:
 	go run cmd/server/server.go -mode=dev
