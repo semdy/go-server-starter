@@ -18,7 +18,6 @@ import (
 	"go-server-starter/pkg/database"
 	"go-server-starter/pkg/jwt"
 	"go-server-starter/pkg/logger"
-	"go-server-starter/pkg/notify"
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/snowflake"
 	"go-server-starter/pkg/taskq"
@@ -126,63 +125,11 @@ func (a *App) Start() error {
 	}
 	a.redis = redis
 
-	// 初始化通知发送器（优先阿里云，失败则降级为日志输出）
-	var smsSender notify.SmsSender = notify.LogSender{}
-	var emailSender notify.EmailSender = notify.LogSender{}
-
-	if a.config.AlibabaCloud.AccessKeyID != "" {
-		if s, err := notify.NewAlibabaSmsSender(
-			a.config.AlibabaCloud.AccessKeyID,
-			a.config.AlibabaCloud.AccessKeySecret,
-			a.logger.Named("ALISMS"),
-		); err == nil {
-			smsSender = s
-		}
-		if s, err := notify.NewAlibabaEmailSender(
-			a.config.AlibabaCloud.AccessKeyID,
-			a.config.AlibabaCloud.AccessKeySecret,
-			a.config.AlibabaCloud.Email.FromAddress,
-			a.config.AlibabaCloud.Email.FromName,
-			a.logger.Named("ALIMAIL"),
-		); err == nil {
-			emailSender = s
-		}
-	}
-
 	// 初始化任务队列
-	taskqClient, err := taskq.NewClient(a.config.AsynQ, a.logger.Named("TASKQ-CLIENT"))
-	if err != nil {
+	smsSender, emailSender := a.initNotify()
+	if err := a.initTaskQueue(smsSender, emailSender); err != nil {
 		return fmt.Errorf("init taskq client: %w", err)
 	}
-	a.taskqClient = taskqClient
-
-	taskqServer := taskq.NewServer(a.config.AsynQ, taskq.ServerConfig{
-		Concurrency: a.config.AsynQ.Concurrency,
-		Queues: map[string]int{
-			"default": 3,
-			"low":     1,
-		},
-	}, a.logger, nil) // nil alerter = default no-op
-
-	// 注入任务处理器依赖
-	taskq.HandlerDeps.SmsSender = smsSender
-	taskq.HandlerDeps.EmailSender = emailSender
-	taskq.HandlerDeps.SMSSignName = a.config.AlibabaCloud.SMS.SignName
-	taskq.HandlerDeps.SMSTemplateCode = a.config.AlibabaCloud.SMS.TemplateCode
-
-	// 注册任务处理器
-	taskqServer.HandleFunc(taskq.TaskEmailWelcome, taskq.HandleEmailWelcome)
-	taskqServer.HandleFunc(taskq.TaskSendSMSCode, taskq.HandleSendSMSCode)
-	taskqServer.HandleFunc(taskq.TaskSendEmailCode, taskq.HandleSendEmailCode)
-
-	// 启动后台 worker
-	go func() {
-		if err := taskqServer.Start(); err != nil {
-			a.logger.Error("taskq worker stopped with error", zap.Error(err))
-		}
-	}()
-
-	a.taskqServer = taskqServer
 
 	// snowflake
 	snowflake, err := snowflake.NewSnowflake(a.config.Server.SnowflakeNode)
@@ -298,14 +245,7 @@ func (a *App) Shutdown() error {
 		}
 	}
 
-	if a.taskqServer != nil {
-		a.taskqServer.Shutdown()
-	}
-	if a.taskqClient != nil {
-		if err := a.taskqClient.Close(); err != nil {
-			a.logger.Error("Failed to close taskq client", zap.Error(err))
-		}
-	}
+	a.shutdownTaskQueue()
 
 	if a.cronSched != nil {
 		a.cronSched.Stop()
