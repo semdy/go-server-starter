@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"go-server-starter/internal/constant"
+	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
@@ -61,8 +62,25 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode
 		return nil, exception.Unauthorized.Append("user is disabled")
 	}
 
+	tenantID := cctx.GetTenantID(ctx)
+	if tenantID == 0 {
+		return nil, exception.Unauthorized.Append("tenant not found")
+	}
+
+	isMember := user.TenantID == tenantID
+	if !isMember {
+		var memberErr error
+		isMember, memberErr = s.repo.User().HasTenantMembership(ctx, user.ID, tenantID)
+		if memberErr != nil {
+			return nil, exception.InternalServerError.Append(memberErr.Error())
+		}
+	}
+	if !isMember {
+		return nil, exception.Unauthorized.Append("user is not a member of tenant")
+	}
+
 	// Check tenant is active
-	tenant, tenantErr := s.repo.Tenant().GetByID(ctx, user.TenantID)
+	tenant, tenantErr := s.repo.Tenant().GetByID(ctx, tenantID)
 	if tenantErr != nil && !errors.Is(tenantErr, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(tenantErr.Error())
 	}
@@ -70,17 +88,17 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode
 		return nil, exception.Unauthorized.Append("tenant is disabled or deleted")
 	}
 
-	rolesCode := make([]enum.RoleCode, len(user.Roles))
-	for i, role := range user.Roles {
+	rolesCode := make([]enum.RoleCode, 0, len(user.Roles))
+	for _, role := range user.Roles {
 		if role.Enabled {
-			rolesCode[i] = role.Code
+			rolesCode = append(rolesCode, role.Code)
 		}
 	}
 	return rolesCode, nil
 }
 
 func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
-	cacheKey := constant.RedisKeyOfAuthRoles(uniCode)
+	cacheKey := constant.RedisKeyOfAuthRoles(cctx.GetTenantID(ctx), uniCode)
 
 	dataStr, err := s.redis.Get(ctx, cacheKey).Result()
 	if err == nil {
@@ -114,7 +132,7 @@ func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, u
 
 		if setErr := s.redis.Set(ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
 			s.logger.Warn("failed to set role cache", zap.String("uniCode", uniCode), zap.Error(setErr))
-			return nil, err
+			return roles, nil
 		}
 
 		return roles, nil
@@ -132,8 +150,16 @@ func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, u
 }
 
 func (s *UserRoleServiceImpl) DeleteRoleCache(ctx context.Context, uniCode string) {
-	key := constant.RedisKeyOfAuthRoles(uniCode)
-	if err := s.redis.Del(ctx, key).Err(); err != nil {
+	pattern := "auth:roles:*:" + uniCode
+	keys, err := s.redis.Keys(ctx, pattern).Result()
+	if err != nil {
+		s.logger.Warn("failed to find role cache keys", zap.String("uniCode", uniCode), zap.Error(err))
+		return
+	}
+	if len(keys) == 0 {
+		return
+	}
+	if err := s.redis.Del(ctx, keys...).Err(); err != nil {
 		s.logger.Warn("failed to delete role cache", zap.String("uniCode", uniCode), zap.Error(err))
 	}
 }
@@ -270,7 +296,7 @@ func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.
 
 func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.Exception {
 	if err := s.repo.UserRole().SoftDelete(ctx, id); err != nil {
-		return nil
+		return exception.InternalServerError.Append(err.Error())
 	}
 
 	// Invalidate caches — deleted role should no longer appear in user role lists

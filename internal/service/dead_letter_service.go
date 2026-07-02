@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	cctx "go-server-starter/internal/ctx"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // DeadLetterService manages dead-letter persistence and retry.
@@ -49,8 +51,12 @@ func (s *DeadLetterServiceImpl) Alert(ctx context.Context, info taskq.AlertInfo)
 
 // Store persists a dead letter to MySQL.
 func (s *DeadLetterServiceImpl) Store(ctx context.Context, info taskq.AlertInfo) {
+	var tenantID *uint64
+	if tid := cctx.GetTenantID(ctx); tid != 0 {
+		tenantID = &tid
+	}
 	dl := &model.DeadLetter{
-		TenantID: cctx.GetTenantID(ctx),
+		TenantID: tenantID,
 		TaskType: info.TaskType,
 		TaskID:   info.TaskID,
 		Payload:  info.Payload,
@@ -71,7 +77,7 @@ func (s *DeadLetterServiceImpl) Store(ctx context.Context, info taskq.AlertInfo)
 func (s *DeadLetterServiceImpl) List(ctx context.Context, params dto.DeadLetterListReqDto) (*dto.PaginationResDto[[]*dto.DeadLetterItem], *exception.Exception) {
 	opts := []repo.QueryOption{
 		repo.Order("failed_at DESC"),
-		repo.Where("tenant_id = ?", cctx.GetTenantID(ctx)),
+		repo.Where("(tenant_id = ? OR tenant_id IS NULL)", cctx.GetTenantID(ctx)),
 		repo.WherePtrNonEmpty("task_type = ?", params.TaskType),
 		repo.WherePtrNonEmpty("is_retried = ?", params.IsRetried),
 	}
@@ -99,7 +105,13 @@ func (s *DeadLetterServiceImpl) List(ctx context.Context, params dto.DeadLetterL
 func (s *DeadLetterServiceImpl) Retry(ctx context.Context, id uint64) *exception.Exception {
 	entry, err := s.repo.DeadLetter().GetByID(ctx, id)
 	if err != nil {
-		return exception.NotFound.Append("dead letter not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return exception.NotFound.Append("dead letter not found")
+		}
+		return exception.InternalServerError.Append(err.Error())
+	}
+	if entry.TenantID != nil && *entry.TenantID != cctx.GetTenantID(ctx) {
+		return exception.Forbidden.Append("dead letter belongs to another tenant")
 	}
 	if entry.IsRetried {
 		return exception.BadRequest.Append("already retried")
@@ -115,7 +127,9 @@ func (s *DeadLetterServiceImpl) Retry(ctx context.Context, id uint64) *exception
 	now := time.Now()
 	entry.IsRetried = true
 	entry.RetriedAt = &now
-	_ = s.repo.DeadLetter().UpdateByZeroFields(ctx, id, entry)
+	if err := s.repo.DeadLetter().UpdateByZeroFields(ctx, id, entry); err != nil {
+		return exception.InternalServerError.Append(err.Error())
+	}
 
 	return nil
 }
@@ -124,6 +138,7 @@ func (s *DeadLetterServiceImpl) RetryAll(ctx context.Context, taskType string) (
 	opts := []repo.QueryOption{
 		repo.Where("task_type = ?", taskType),
 		repo.Where("is_retried = ?", false),
+		repo.Where("(tenant_id = ? OR tenant_id IS NULL)", cctx.GetTenantID(ctx)),
 		repo.Order("failed_at ASC"),
 	}
 	entries, _, err := s.repo.DeadLetter().GetTable(ctx, 1, 1000, opts...)
@@ -141,7 +156,10 @@ func (s *DeadLetterServiceImpl) RetryAll(ctx context.Context, taskType string) (
 		now := time.Now()
 		entry.IsRetried = true
 		entry.RetriedAt = &now
-		_ = s.repo.DeadLetter().UpdateByZeroFields(ctx, entry.ID, entry)
+		if err := s.repo.DeadLetter().UpdateByZeroFields(ctx, entry.ID, entry); err != nil {
+			s.logger.Warn("failed to mark dead letter retried", zap.Uint64("id", entry.ID), zap.Error(err))
+			continue
+		}
 		count++
 	}
 
@@ -149,6 +167,16 @@ func (s *DeadLetterServiceImpl) RetryAll(ctx context.Context, taskType string) (
 }
 
 func (s *DeadLetterServiceImpl) Delete(ctx context.Context, id uint64) *exception.Exception {
+	entry, err := s.repo.DeadLetter().GetByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return exception.NotFound.Append("dead letter not found")
+		}
+		return exception.InternalServerError.Append(err.Error())
+	}
+	if entry.TenantID != nil && *entry.TenantID != cctx.GetTenantID(ctx) {
+		return exception.Forbidden.Append("dead letter belongs to another tenant")
+	}
 	if err := s.repo.DeadLetter().HardDelete(ctx, id); err != nil {
 		return exception.InternalServerError.Append(err.Error())
 	}

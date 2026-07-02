@@ -102,6 +102,10 @@ func (s *AuthServiceImpl) loginOrRegister(
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
+		if err := userRepo.AddTenantMembership(ctx, user.ID, defaultTenant.ID); err != nil {
+			tx.Rollback()
+			return nil, exception.InternalServerError.Append(err.Error())
+		}
 		if err := tx.Commit().Error; err != nil {
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
@@ -175,7 +179,15 @@ func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, para
 		return nil, exception.Forbidden.Append("tenant not found or disabled")
 	}
 
-	if user.TenantID != tenant.ID {
+	isMember := user.TenantID == tenant.ID
+	if !isMember {
+		var memberErr error
+		isMember, memberErr = s.repo.User().HasTenantMembership(ctx, user.ID, tenant.ID)
+		if memberErr != nil {
+			return nil, exception.InternalServerError.Append(memberErr.Error())
+		}
+	}
+	if !isMember {
 		return nil, exception.Forbidden.Append("user is not a member of this tenant")
 	}
 

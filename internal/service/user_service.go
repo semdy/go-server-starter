@@ -173,9 +173,18 @@ func (s *UserServiceImpl) UserCreate(ctx context.Context, params dto.CreateUserR
 	if existing != nil {
 		return nil, exception.BadRequest.Append("email already exists in this tenant")
 	}
-	uniCode, _ := s.repo.User().GenerateUniCode(ctx)
+	uniCode, err := s.repo.User().GenerateUniCode(ctx)
+	if err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
 	user := &model.User{TenantID: tid, UniCode: uniCode, Active: true, Email: params.Email, Nickname: params.Nickname}
-	if err := s.repo.User().Create(ctx, user); err != nil {
+	if err := s.repo.Transaction(ctx, func(tx *gorm.DB) error {
+		userRepo := s.repo.User().WithTx(tx)
+		if err := userRepo.Create(ctx, user); err != nil {
+			return err
+		}
+		return userRepo.AddTenantMembership(ctx, user.ID, tid)
+	}); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 	return userToInfoDto(user), nil
@@ -196,6 +205,9 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 	if params.Desc != nil {
 		user.Desc = *params.Desc
 	}
+	if params.Active != nil {
+		user.Active = *params.Active
+	}
 	if err := s.repo.User().UpdateByZeroFields(ctx, id, user); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -209,9 +221,20 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 func (s *UserServiceImpl) UserDelete(ctx context.Context, id uint64) *exception.Exception {
 	tid := cctx.GetTenantID(ctx)
 	user, err := s.repo.User().GetOne(ctx, repo.Where("id = ? AND tenant_id = ?", id, tid))
-	if err != nil || user == nil {
-		return nil
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return exception.UserNotFound
+		}
+		return exception.InternalServerError.Append(err.Error())
 	}
-	_ = s.repo.User().SoftDelete(ctx, id)
+	if user == nil {
+		return exception.UserNotFound
+	}
+	if err := s.repo.User().SoftDelete(ctx, id); err != nil {
+		return exception.InternalServerError.Append(err.Error())
+	}
+	if s.roleService != nil {
+		s.roleService.DeleteRoleCache(ctx, user.UniCode)
+	}
 	return nil
 }

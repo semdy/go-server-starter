@@ -77,10 +77,6 @@ func (j *JWT) GetTokenFromGinContext(c *gin.Context) (string, error) {
 	var token string
 	keys := []string{"Authorization", "token"}
 	for _, key := range keys {
-		if value, exist := c.GetQuery(key); exist {
-			token = strings.TrimPrefix(value, "Bearer ")
-			break
-		}
 		if value := c.GetHeader(key); value != "" {
 			token = strings.TrimPrefix(value, "Bearer ")
 			break
@@ -114,6 +110,9 @@ func (j *JWT) GenerateToken(uniCode string, tenantID uint64, deviceType enum.Dev
 
 func (j *JWT) ParseAndVerifyToken(tokenStr string) (*CustomClaims, error) {
 	var token, err = jwt.ParseWithClaims(tokenStr, &CustomClaims{}, func(token *jwt.Token) (any, error) {
+		if token.Method != jwt.SigningMethodHS256 {
+			return nil, errors.New("unexpected token signing method")
+		}
 		return []byte(j.config.TokenSecret), nil
 	})
 	if err != nil || token == nil || !token.Valid {

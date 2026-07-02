@@ -121,8 +121,10 @@ func (s *TenantServiceImpl) Update(ctx context.Context, id uint64, params dto.Te
 
 func (s *TenantServiceImpl) Delete(ctx context.Context, id uint64) *exception.Exception {
 	if err := s.repo.Tenant().SoftDelete(ctx, id); err != nil {
-		return nil
+		return exception.InternalServerError.Append(err.Error())
 	}
-	s.roleService.InvalidateAllRoleCaches(ctx)
+	if s.roleService != nil {
+		s.roleService.InvalidateAllRoleCaches(ctx)
+	}
 	return nil
 }

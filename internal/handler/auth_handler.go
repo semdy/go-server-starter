@@ -140,7 +140,7 @@ func (h *AuthHandlerImpl) SendEmailCode(c *gin.Context) {
 
 // SwitchTenant godoc
 // @Summary      切换租户
-// @Description  切换到指定租户，签发新的 JWT token（旧 token 仍有效）。需已是目标租户成员。
+// @Description  切换到指定租户，签发新的 JWT token（旧 token 仍有效）。用户必须属于目标租户（默认租户或 user_tenant_refs 成员关系）。
 // @Tags         auth
 // @Accept       json
 // @Produce      json

@@ -19,6 +19,8 @@ type UserRepo interface {
 	GetByUniCode(ctx context.Context, uniCode string) (*model.User, error)
 	GetRolesByUniCode(ctx context.Context, uniCode string) ([]*model.UserRole, error)
 	GetRolesByID(ctx context.Context, id uint64) ([]*model.UserRole, error)
+	AddTenantMembership(ctx context.Context, userID uint64, tenantID uint64) error
+	HasTenantMembership(ctx context.Context, userID uint64, tenantID uint64) (bool, error)
 }
 
 type UserRepoImpl struct {
@@ -100,4 +102,19 @@ func (r *UserRepoImpl) GetRolesByID(ctx context.Context, id uint64) ([]*model.Us
 		}
 	}
 	return roles, nil
+}
+
+func (r *UserRepoImpl) AddTenantMembership(ctx context.Context, userID uint64, tenantID uint64) error {
+	return r.db.WithContext(ctx).
+		Exec("INSERT IGNORE INTO user_tenant_refs (user_id, tenant_id) VALUES (?, ?)", userID, tenantID).
+		Error
+}
+
+func (r *UserRepoImpl) HasTenantMembership(ctx context.Context, userID uint64, tenantID uint64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).
+		Table("user_tenant_refs").
+		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
+		Count(&count).Error
+	return count > 0, err
 }

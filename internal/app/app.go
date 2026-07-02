@@ -66,7 +66,7 @@ func (a *App) Start() error {
 	var isDev = a.config.Mode == enum.ServerModeDev
 	// 初始化gin引擎
 	a.engine = gin.New()
-	a.engine.Use(gin.Recovery())
+	// a.engine.Use(gin.Recovery())
 	a.engine.Use(middleware.ZapLogger(a.logger.Named("GIN")))
 	a.engine.Use(middleware.ZapRecovery(a.logger.Named("GIN-RECOVERY"), isDev))
 

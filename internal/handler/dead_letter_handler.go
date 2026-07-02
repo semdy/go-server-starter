@@ -3,6 +3,7 @@ package handler
 import (
 	"go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
+	"go-server-starter/internal/exception"
 	"go-server-starter/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,7 @@ func NewDeadLetterHandler(logger *zap.Logger, service service.Service) DeadLette
 
 // List godoc
 // @Summary      死信列表（DB）
-// @Description  分页查询已落库的死信记录。仅 super_admin 可访问。
+// @Description  分页查询当前租户及系统级（tenant_id 为 NULL）的死信记录。仅 super_admin 可访问。
 // @Tags         admin
 // @Accept       json
 // @Produce      json
@@ -55,7 +56,7 @@ func (h *DeadLetterHandlerImpl) List(c *gin.Context) {
 
 // Retry godoc
 // @Summary      重试单条死信
-// @Description  将指定死信任务重新入队，并标记为已重试。仅 super_admin 可访问。
+// @Description  将当前租户或系统级死信任务重新入队，并标记为已重试。仅 super_admin 可访问。
 // @Tags         admin
 // @Accept       json
 // @Produce      json
@@ -79,7 +80,7 @@ func (h *DeadLetterHandlerImpl) Retry(c *gin.Context) {
 
 // RetryAll godoc
 // @Summary      批量重试死信
-// @Description  将指定类型的所有未重试死信重新入队。仅 super_admin 可访问。
+// @Description  将指定类型下当前租户及系统级的所有未重试死信重新入队。仅 super_admin 可访问。
 // @Tags         admin
 // @Accept       json
 // @Produce      json
@@ -91,7 +92,7 @@ func (h *DeadLetterHandlerImpl) RetryAll(c *gin.Context) {
 	var appCtx = ctx.FromGinCtx(c)
 	taskType := c.Query("taskType")
 	if taskType == "" {
-		appCtx.ToError(appCtx.ShouldBind(&struct{}{})) // 用已有异常
+		appCtx.ToError(exception.InvalidParam.Append("taskType is required"))
 		return
 	}
 	count, err := h.service.DeadLetter().RetryAll(appCtx.Ctx, taskType)
@@ -104,7 +105,7 @@ func (h *DeadLetterHandlerImpl) RetryAll(c *gin.Context) {
 
 // Delete godoc
 // @Summary      删除死信记录
-// @Description  物理删除指定死信记录。仅 super_admin 可访问。
+// @Description  物理删除当前租户或系统级死信记录。仅 super_admin 可访问。
 // @Tags         admin
 // @Accept       json
 // @Produce      json

@@ -24,7 +24,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "分页查询已落库的死信记录。仅 super_admin 可访问。",
+                "description": "分页查询当前租户及系统级（tenant_id 为 NULL）的死信记录。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -76,7 +76,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "物理删除指定死信记录。仅 super_admin 可访问。",
+                "description": "物理删除当前租户或系统级死信记录。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -116,7 +116,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "将指定死信任务重新入队，并标记为已重试。仅 super_admin 可访问。",
+                "description": "将当前租户或系统级死信任务重新入队，并标记为已重试。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -156,7 +156,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "将指定类型的所有未重试死信重新入队。仅 super_admin 可访问。",
+                "description": "将指定类型下当前租户及系统级的所有未重试死信重新入队。仅 super_admin 可访问。",
                 "consumes": [
                     "application/json"
                 ],
@@ -622,7 +622,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "切换到指定租户，签发新的 JWT token（旧 token 仍有效）。需已是目标租户成员。",
+                "description": "切换到指定租户，签发新的 JWT token（旧 token 仍有效）。用户必须属于目标租户（默认租户或 user_tenant_refs 成员关系）。",
                 "consumes": [
                     "application/json"
                 ],
