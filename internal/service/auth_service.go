@@ -51,7 +51,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 			return nil, exception.Forbidden.Append("user is disabled")
 		}
 		// Verify tenant is active
-		tenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", user.TenantID))
+		tenant, tenantErr := s.repo.Tenant().GetByID(ctx, user.TenantID)
 		if tenantErr != nil || tenant == nil || !tenant.Active {
 			return nil, exception.Forbidden.Append("tenant is disabled or deleted")
 		}
@@ -85,8 +85,14 @@ func (s *AuthServiceImpl) loginOrRegister(
 			return nil, exception.UserRoleNotFound
 		}
 
+		defaultTenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", "default"))
+		if tenantErr != nil || defaultTenant == nil {
+			tx.Rollback()
+			return nil, exception.InternalServerError.Append("default tenant not found")
+		}
+
 		user = newUser(uniCode)
-		user.TenantID = "default"
+		user.TenantID = defaultTenant.ID
 		user.Active = true
 		user.Roles = []model.UserRole{*role}
 
@@ -167,11 +173,11 @@ func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, para
 		return nil, exception.Forbidden.Append("tenant not found or disabled")
 	}
 
-	if user.TenantID != params.TenantCode {
+	if user.TenantID != tenant.ID {
 		return nil, exception.Forbidden.Append("user is not a member of this tenant")
 	}
 
-	token, tokenErr := s.jwt.GenerateToken(user.UniCode, params.TenantCode, enum.DeviceTypeWeb)
+	token, tokenErr := s.jwt.GenerateToken(user.UniCode, tenant.ID, enum.DeviceTypeWeb)
 	if tokenErr != nil {
 		return nil, exception.InternalServerError.Append(tokenErr.Error())
 	}

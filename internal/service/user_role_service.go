@@ -62,7 +62,7 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode
 	}
 
 	// Check tenant is active
-	tenant, tenantErr := s.repo.Tenant().GetOne(ctx, repo.Where("code = ?", user.TenantID))
+	tenant, tenantErr := s.repo.Tenant().GetByID(ctx, user.TenantID)
 	if tenantErr != nil && !errors.Is(tenantErr, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(tenantErr.Error())
 	}

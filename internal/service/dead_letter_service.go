@@ -39,11 +39,7 @@ type DeadLetterServiceImpl struct {
 }
 
 func NewDeadLetterService(repo repo.Repo, taskqClient *taskq.Client, logger *zap.Logger) DeadLetterService {
-	return &DeadLetterServiceImpl{
-		repo:   repo,
-		taskq:  taskqClient,
-		logger: logger,
-	}
+	return &DeadLetterServiceImpl{repo: repo, taskq: taskqClient, logger: logger}
 }
 
 // Alert implements taskq.Alerter. Called by the taskq ErrorHandler when retries are exhausted.
@@ -54,7 +50,7 @@ func (s *DeadLetterServiceImpl) Alert(ctx context.Context, info taskq.AlertInfo)
 // Store persists a dead letter to MySQL.
 func (s *DeadLetterServiceImpl) Store(ctx context.Context, info taskq.AlertInfo) {
 	dl := &model.DeadLetter{
-		TenantID:  cctx.GetTenantID(ctx),
+		TenantID: cctx.GetTenantID(ctx),
 		TaskType: info.TaskType,
 		TaskID:   info.TaskID,
 		Payload:  info.Payload,
@@ -139,10 +135,7 @@ func (s *DeadLetterServiceImpl) RetryAll(ctx context.Context, taskType string) (
 	for _, entry := range entries {
 		task := asynq.NewTask(entry.TaskType, entry.Payload)
 		if _, err := s.taskq.Enqueue(ctx, task, taskq.RetryByType(entry.TaskType)...); err != nil {
-			s.logger.Warn("failed to re-enqueue dead letter",
-				zap.Uint64("id", entry.ID),
-				zap.Error(err),
-			)
+			s.logger.Warn("failed to re-enqueue dead letter", zap.Uint64("id", entry.ID), zap.Error(err))
 			continue
 		}
 		now := time.Now()

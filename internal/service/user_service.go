@@ -44,11 +44,7 @@ func NewUserService(repo repo.Repo, redis *redis.Client, roleService UserRoleSer
 
 // tenantFilter returns a Where option for the current tenant.
 func tenantFilter(ctx context.Context) repo.QueryOption {
-	tid := cctx.GetTenantID(ctx)
-	if tid == "" {
-		tid = "default"
-	}
-	return repo.Where("tenant_id = ?", tid)
+	return repo.Where("tenant_id = ?", cctx.GetTenantID(ctx))
 }
 
 func (s *UserServiceImpl) GetByID(ctx context.Context, id uint64) (*model.User, *exception.Exception) {
@@ -170,9 +166,6 @@ func userToInfoDto(user *model.User) *dto.UserInfoResDto {
 
 func (s *UserServiceImpl) UserCreate(ctx context.Context, params dto.CreateUserReqDto) (*dto.UserInfoResDto, *exception.Exception) {
 	tid := cctx.GetTenantID(ctx)
-	if tid == "" {
-		tid = "default"
-	}
 	existing, err := s.repo.User().GetOne(ctx, repo.Where("email = ? AND tenant_id = ?", params.Email, tid))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
@@ -190,9 +183,6 @@ func (s *UserServiceImpl) UserCreate(ctx context.Context, params dto.CreateUserR
 
 func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.UserUpdateInfoReqDto) (*dto.UserInfoResDto, *exception.Exception) {
 	tid := cctx.GetTenantID(ctx)
-	if tid == "" {
-		tid = "default"
-	}
 	user, err := s.repo.User().GetByID(ctx, id, repo.Preload("Roles"))
 	if err != nil || user == nil || user.TenantID != tid {
 		return nil, exception.UserNotFound
@@ -218,9 +208,6 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 
 func (s *UserServiceImpl) UserDelete(ctx context.Context, id uint64) *exception.Exception {
 	tid := cctx.GetTenantID(ctx)
-	if tid == "" {
-		tid = "default"
-	}
 	user, err := s.repo.User().GetOne(ctx, repo.Where("id = ? AND tenant_id = ?", id, tid))
 	if err != nil || user == nil {
 		return nil

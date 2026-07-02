@@ -5,15 +5,12 @@ import "context"
 type tenantKey struct{}
 
 // WithTenant stores tenant_id in a context.Context.
-func WithTenant(ctx context.Context, tenantID string) context.Context {
+func WithTenant(ctx context.Context, tenantID uint64) context.Context {
 	return context.WithValue(ctx, tenantKey{}, tenantID)
 }
 
-// GetTenantID extracts tenant_id from a context.Context.
-// Returns empty string if not set.
-func GetTenantID(ctx context.Context) string {
-	if v, ok := ctx.Value(tenantKey{}).(string); ok {
-		return v
-	}
-	return ""
+// GetTenantID extracts tenant_id from a context.Context. Returns 0 if not set.
+func GetTenantID(ctx context.Context) uint64 {
+	v, _ := ctx.Value(tenantKey{}).(uint64)
+	return v
 }

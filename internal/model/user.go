@@ -2,7 +2,7 @@ package model
 
 type User struct {
 	Model
-	TenantID    string     `json:"tenantId"`
+	TenantID    uint64     `json:"tenantId"`
 	UniCode     string     `json:"uniCode"`
 	Active      bool       `json:"active"`
 	Email       string     `json:"email"`

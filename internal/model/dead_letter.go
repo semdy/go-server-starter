@@ -5,7 +5,7 @@ import "time"
 // DeadLetter stores a task that exhausted all retries.
 type DeadLetter struct {
 	Model
-	TenantID  string     `json:"tenantId"`
+	TenantID  uint64     `json:"tenantId"`
 	TaskType  string     `json:"taskType"`
 	TaskID    string     `json:"taskId"`
 	Queue     string     `json:"queue"`

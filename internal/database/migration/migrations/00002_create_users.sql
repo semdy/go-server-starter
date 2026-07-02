@@ -6,6 +6,7 @@ CREATE TABLE users (
     deleted_at DATETIME(3) NULL,
     version BIGINT UNSIGNED DEFAULT 0,
     uni_code VARCHAR(64) NOT NULL,
+    tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
     email VARCHAR(255),
     mobile VARCHAR(32),
     country_code VARCHAR(8),
@@ -18,6 +19,8 @@ CREATE TABLE users (
     INDEX idx_email (email),
     INDEX idx_mobile_country (mobile, country_code),
     INDEX idx_nickname (nickname),
+    UNIQUE INDEX idx_email_tenant (email, tenant_id),
+    INDEX idx_tenant_id (tenant_id),
     INDEX idx_deleted_at (deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

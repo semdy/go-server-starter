@@ -77,15 +77,15 @@ func (c *Context) SetUserUniCode(code string) {
 	c.Gtx.Set(constant.CTX_KEY_OF_USER_UNI_CODE, code)
 }
 
-func (c *Context) GetTenantID() (string, *exception.Exception) {
-	tid := c.Gtx.GetString(constant.CTX_KEY_OF_TENANT_ID)
-	if tid == "" {
-		return "", exception.Forbidden.Append("tenant not found")
+func (c *Context) GetTenantID() (uint64, *exception.Exception) {
+	tid, ok := c.Gtx.Get(constant.CTX_KEY_OF_TENANT_ID)
+	if !ok {
+		return 0, exception.Forbidden.Append("tenant not found")
 	}
-	return tid, nil
+	return tid.(uint64), nil
 }
 
-func (c *Context) SetTenantID(tid string) {
+func (c *Context) SetTenantID(tid uint64) {
 	c.Gtx.Set(constant.CTX_KEY_OF_TENANT_ID, tid)
 }
 

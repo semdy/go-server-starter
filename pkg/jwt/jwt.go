@@ -16,7 +16,7 @@ import (
 
 type CustomClaims struct {
 	UniCode  string `json:"uniCode"`  // 用户唯一码
-	TenantID string `json:"tenantId"` // 租户 ID
+	TenantID uint64 `json:"tenantId"` // 租户 ID
 	jwt.RegisteredClaims
 }
 
@@ -92,7 +92,7 @@ func (j *JWT) GetTokenFromGinContext(c *gin.Context) (string, error) {
 	return token, nil
 }
 
-func (j *JWT) GenerateToken(uniCode, tenantID string, deviceType enum.DeviceType) (string, error) {
+func (j *JWT) GenerateToken(uniCode string, tenantID uint64, deviceType enum.DeviceType) (string, error) {
 	expire := j.config.TokenExpires.Get(deviceType)
 	now := time.Now()
 	claims := CustomClaims{
