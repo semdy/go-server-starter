@@ -22,3 +22,6 @@ enum:
 generate:
 	@if [ -z "$(MODULE)" ]; then echo "Usage: make generate MODULE=product"; exit 1; fi
 	./generate.sh $(MODULE)
+
+rebuild_db:
+	docker exec -i go-starter-mysql-dev mysql -u root -proot -e "DROP DATABASE IF EXISTS test_db; CREATE DATABASE test_db CHARACTER SET utf8mb4"
