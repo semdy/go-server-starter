@@ -15,6 +15,7 @@ swagger:
 install:
 	go install github.com/abice/go-enum@latest
 	go install github.com/swaggo/swag/cmd/swag@latest
+	go install github.com/air-verse/air@latest
 
 enum:
 	go generate ./internal/enum/...

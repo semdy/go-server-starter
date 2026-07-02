@@ -49,6 +49,7 @@ func (a *AuthImpl) RoleCheck(roleCheckType RoleCheckType, requiredRoles ...enum.
 			return
 		}
 		if !a.checkRoles(roleCheckType, userRoles, requiredRoles) {
+			a.logger.Warn("role check failed", zap.Any("userRoles", userRoles), zap.Any("requiredRoles", requiredRoles))
 			ctx.ToError(exception.Forbidden)
 			return
 		}

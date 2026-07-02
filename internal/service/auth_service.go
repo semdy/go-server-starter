@@ -65,6 +65,8 @@ func (s *AuthServiceImpl) loginOrRegister(
 		defer func() {
 			if r := recover(); r != nil {
 				tx.Rollback()
+				s.logger.Error("panic in loginOrRegister", zap.Any("panic", r))
+				panic(r) // re-panic after cleanup
 			}
 		}()
 
