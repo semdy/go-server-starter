@@ -39,13 +39,13 @@ go-server-starter/
 │   ├── ctx/                 # Custom request context (Gin wrapper)
 │   ├── database/
 │   │   └── migration/       # Goose migrations (embedded SQL)
-│   │   └── migrate.go     # Goose migrations entry point
+│   │   └── migrate.go       # Goose migrations entry point
 │   ├── dto/                 # Data Transfer Objects
 │   ├── enum/                # Enumerations
 │   ├── exception/           # Domain exceptions with i18n
 │   ├── handler/             # HTTP handlers (controllers)
 │   ├── i18n/                # Internationalization
-│   ├── middleware/           # HTTP middlewares
+│   ├── middleware/          # HTTP middlewares
 │   ├── model/               # Database models (GORM)
 │   ├── repo/                # Repository layer (data access)
 │   ├── router/              # Route definitions

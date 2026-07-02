@@ -45,7 +45,7 @@ go-server-starter/
 │   ├── exception/           # 领域异常（含 i18n）
 │   ├── handler/             # HTTP 处理器（控制器）
 │   ├── i18n/                # 国际化
-│   ├── middleware/           # HTTP 中间件
+│   ├── middleware/          # HTTP 中间件
 │   ├── model/               # 数据库模型（GORM）
 │   ├── repo/                # 仓储层（数据访问）
 │   ├── router/              # 路由定义
