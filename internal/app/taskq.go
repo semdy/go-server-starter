@@ -50,6 +50,7 @@ func (a *App) initTaskQueue(smsSender notify.SmsSender, emailSender notify.Email
 	}, a.logger, nil) // nil alerter = default no-op
 
 	// 注入任务处理器依赖
+	taskq.HandlerDeps.Logger = a.logger.Named("TASKQ-HANDLER")
 	taskq.HandlerDeps.SmsSender = smsSender
 	taskq.HandlerDeps.EmailSender = emailSender
 	taskq.HandlerDeps.SMSSignName = a.config.AlibabaCloud.SMS.SignName

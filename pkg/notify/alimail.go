@@ -11,10 +11,10 @@ import (
 
 // AlibabaEmailSender sends emails via Alibaba Cloud DirectMail.
 type AlibabaEmailSender struct {
-	client     *dm.Client
-	fromAddr   string
-	fromName   string
-	logger     *zap.Logger
+	client   *dm.Client
+	fromAddr string
+	fromName string
+	logger   *zap.Logger
 }
 
 // NewAlibabaEmailSender creates an Alibaba Cloud DirectMail sender.

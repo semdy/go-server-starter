@@ -7,14 +7,15 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"go.uber.org/zap"
 )
 
 // ----- Task type constants -----
 // Register new task types here. Convention: "domain:action".
 const (
-	TaskEmailWelcome  = "email:welcome"     // 发送欢迎邮件
-	TaskSendSMSCode   = "sms:send_code"     // 发送短信验证码
-	TaskSendEmailCode = "email:send_code"   // 发送邮箱验证码
+	TaskEmailWelcome  = "email:welcome"   // 发送欢迎邮件
+	TaskSendSMSCode   = "sms:send_code"   // 发送短信验证码
+	TaskSendEmailCode = "email:send_code" // 发送邮箱验证码
 )
 
 // ----- Payload types -----
@@ -43,6 +44,7 @@ type SendEmailCodePayload struct {
 // HandlerDeps holds the dependencies task handlers need.
 // Set these before registering handlers in app.go.
 var HandlerDeps struct {
+	Logger *zap.Logger
 	EmailSender interface {
 		SendEmail(ctx context.Context, to, subject, bodyHTML string) error
 	}
@@ -134,6 +136,13 @@ func HandleEmailWelcome(ctx context.Context, task *asynq.Task) error {
 	var payload EmailWelcomePayload
 	if err := json.Unmarshal(task.Payload(), &payload); err != nil {
 		return asynq.SkipRetry
+	}
+
+	if HandlerDeps.Logger != nil {
+		HandlerDeps.Logger.Info("sending welcome email",
+			zap.String("email", payload.Email),
+			zap.String("uniCode", payload.UserUniCode),
+		)
 	}
 
 	// Render welcome email from template
