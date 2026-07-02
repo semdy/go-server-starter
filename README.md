@@ -39,6 +39,7 @@ go-server-starter/
 │   ├── ctx/                 # Custom request context (Gin wrapper)
 │   ├── database/
 │   │   └── migration/       # Goose migrations (embedded SQL)
+│   │   └── migrate.go     # Goose migrations entry point
 │   ├── dto/                 # Data Transfer Objects
 │   ├── enum/                # Enumerations
 │   ├── exception/           # Domain exceptions with i18n
@@ -51,16 +52,19 @@ go-server-starter/
 │   ├── seed/                # Database seeders
 │   └── service/             # Business logic layer
 ├── pkg/
-│   ├── asyn_queue/          # Asynq client/server
 │   ├── auth/                # RBAC middleware
+│   ├── cronjob/             # Cron job scheduler
 │   ├── database/            # MySQL connection & auto-create DB
 │   ├── jwt/                 # JWT token management
 │   ├── logger/              # Zap logger + Lumberjack rotation
+│   ├── notify/              # Email/SMS verify code Notification service
 │   ├── redis/               # Redis client
 │   ├── snowflake/           # Snowflake ID generator
+│   ├── taskq/               # Asynq client/server
 │   ├── translator/          # Validator translator (zh/en)
 │   ├── utils/               # Common utilities
-│   └── validator/           # Custom validation rules
+│   ├── validator/           # Custom validation rules
+│   └── verify_code/         # Verify Email/SMS verify code
 ├── .air.toml                # Air hot reload config
 ├── .env.example             # Environment variables template
 ├── CLAUDE.md                # Claude Code guidance
@@ -68,6 +72,7 @@ go-server-starter/
 ├── docker-compose.yml       # Production Docker Compose
 ├── docker-compose.dev.yml   # Dev Docker Compose (MySQL + Redis only)
 ├── generate.sh              # Entity scaffold generator
+├── Makefile                 # Build and run tasks
 ├── go.mod
 ├── go.sum
 └── logs/                    # Log files
@@ -309,10 +314,12 @@ Each migration is a single `.sql` file with `-- +goose Up` / `-- +goose Down` ma
 
 ```
 internal/database/migration/migrations/
-├── 00001_create_user_roles.sql
-├── 00002_create_users.sql
-├── 00003_create_user_role_refs.sql
-└── 00004_create_dead_letters.sql
+  ├── 00001_create_user_roles.sql
+  ├── 00002_create_tenants.sql
+  ├── 00003_create_users.sql
+  └── 00004_create_user_role_refs.sql
+  └── 00005_create_dead_letters.sql
+  └── 00006_create_user_tenant_refs.sql
 ```
 
 ### Adding a new table
@@ -531,17 +538,17 @@ make swagger   # regenerate API docs from handler annotations
 ### With Docker
 
   1. startup docker compose
-  ``bash
+  ```bash
   docker compose -f docker-compose.dev.yml up -d
   ```
 
   2. startup Go app (hot reload, auto restart on code change)
-  ``bash
+  ```bash
   air
   ```
 
   3. stop docker compose
-  ``bash
+  ```bash
   docker compose -f docker-compose.dev.yml down
   ```
 

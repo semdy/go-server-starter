@@ -39,6 +39,7 @@ go-server-starter/
 │   ├── ctx/                 # 自定义请求上下文（Gin 封装）
 │   ├── database/
 │   │   └── migration/       # Goose 迁移文件（embed SQL）
+│   │   └── migrate.go       # Goose 迁移入口文件
 │   ├── dto/                 # 数据传输对象
 │   ├── enum/                # 枚举类型
 │   ├── exception/           # 领域异常（含 i18n）
@@ -51,16 +52,19 @@ go-server-starter/
 │   ├── seed/                # 数据库种子数据
 │   └── service/             # 业务逻辑层
 ├── pkg/
-│   ├── asyn_queue/          # Asynq 客户端/服务端
 │   ├── auth/                # RBAC 中间件
+│   ├── cronjob/             # 定时任务
 │   ├── database/            # MySQL 连接 & 自动建库
 │   ├── jwt/                 # JWT 令牌管理
 │   ├── logger/              # Zap 日志 + Lumberjack 轮转
+│   ├── notify/              # 邮件/短信验证码发送服务
 │   ├── redis/               # Redis 客户端
 │   ├── snowflake/           # 雪花 ID 生成器
+│   ├── taskq/               # Asynq 客户端/服务端
 │   ├── translator/          # 验证器翻译（zh/en）
 │   ├── utils/               # 通用工具
 │   └── validator/           # 自定义验证规则
+│   └── verify_code/         # 验证码验证器
 ├── .air.toml                # Air 热重载配置
 ├── .env.example             # 环境变量模板
 ├── CLAUDE.md                # Claude Code 指引
@@ -68,6 +72,7 @@ go-server-starter/
 ├── docker-compose.yml       # 生产环境 Docker Compose
 ├── docker-compose.dev.yml   # 开发环境（仅 MySQL + Redis）
 ├── generate.sh              # 模块脚手架生成器
+├── Makefile                 # 构建工具
 ├── go.mod
 ├── go.sum
 └── logs/                    # 日志文件
@@ -308,10 +313,12 @@ router.Use(r.ratelimit.RateLimitByUser(60, "USER"))  // 用户限流
 
 ```
 internal/database/migration/migrations/
-├── 00001_create_user_roles.sql
-├── 00002_create_users.sql
-├── 00003_create_user_role_refs.sql
-└── 00004_create_dead_letters.sql
+  ├── 00001_create_user_roles.sql
+  ├── 00002_create_tenants.sql
+  ├── 00003_create_users.sql
+  └── 00004_create_user_role_refs.sql
+  └── 00005_create_dead_letters.sql
+  └── 00006_create_user_tenant_refs.sql
 ```
 
 ### 添加新表
@@ -530,17 +537,17 @@ make swagger   # 从 handler 注解重新生成 API 文档
 ### 日常开发流程
 
   1. 启动依赖服务
-  ``bash
+  ```bash
   docker compose -f docker-compose.dev.yml up -d
   ```
 
   2. 启动 Go 应用（热重载，修改代码自动重启）
-  ``bash
+  ```bash
   air
   ```
 
   3. 开发完成后停止依赖服务
-  ``bash
+  ```bash
   docker compose -f docker-compose.dev.yml down
   ```
 
