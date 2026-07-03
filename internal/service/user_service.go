@@ -155,7 +155,7 @@ func (s *UserServiceImpl) UpdateMyInfo(ctx context.Context, uniCode string, para
 	if len(updates) == 0 {
 		return userToInfoDto(user), nil
 	}
-	_, err = s.repo.User().UpdateByIDAndTenant(ctx, user.ID, tid, updates)
+	_, err = s.repo.User().UpdateByMapWithTenant(ctx, user.ID, tid, updates)
 	if err != nil {
 		return nil, exception.UserUpdateInfoFailed.Append(err.Error())
 	}
@@ -239,7 +239,7 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 		updates["active"] = user.Active
 	}
 	if len(updates) > 0 {
-		_, err := s.repo.User().UpdateByIDAndTenant(ctx, id, tid, updates)
+		_, err := s.repo.User().UpdateByMapWithTenant(ctx, id, tid, updates)
 		if err != nil {
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
@@ -263,7 +263,7 @@ func (s *UserServiceImpl) UserDelete(ctx context.Context, id uint64) *exception.
 	if user == nil {
 		return exception.UserNotFound
 	}
-	rows, err := s.repo.User().SoftDeleteByIDAndTenant(ctx, id, tid)
+	rows, err := s.repo.User().SoftDeleteWithTenant(ctx, id, tid)
 	if err != nil {
 		return exception.InternalServerError.Append(err.Error())
 	}

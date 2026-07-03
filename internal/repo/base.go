@@ -23,6 +23,10 @@ type BaseRepo[T any] interface {
 	CreateBatch(ctx context.Context, entities []*T) error
 	// update by map 使用map更新数据
 	UpdateByMap(ctx context.Context, id uint64, entity map[string]any) error
+	// update by map with tenant 使用map更新租户内数据
+	UpdateByMapWithTenant(ctx context.Context, id uint64, tenantID uint64, entity map[string]any) (int64, error)
+	// update by map with tenant or system 使用map更新租户内或系统级数据（tenant_id IS NULL）
+	UpdateByMapWithTenantOrSystem(ctx context.Context, id uint64, tenantID uint64, entity map[string]any) (int64, error)
 	// update by zero fields 使用零字段更新数据
 	UpdateByZeroFields(ctx context.Context, id uint64, entity *T) error
 	// update by non zero fields 使用非零字段更新数据
@@ -40,15 +44,29 @@ type BaseRepo[T any] interface {
 
 	// delete 删除数据
 	SoftDelete(ctx context.Context, id uint64) error
+	// delete with tenant 删除租户内数据
+	SoftDeleteWithTenant(ctx context.Context, id uint64, tenantID uint64) (int64, error)
 	// soft delete by ids 软删除批量数据
 	SoftDeleteByIDs(ctx context.Context, ids []uint64) error
+	// soft delete by ids with tenant 软删除租户内批量数据
+	SoftDeleteByIDsWithTenant(ctx context.Context, ids []uint64, tenantID uint64) (int64, error)
 	// hard delete 硬删除数据
 	HardDelete(ctx context.Context, id uint64) error
+	// hard delete with tenant 硬删除租户内数据
+	HardDeleteWithTenant(ctx context.Context, id uint64, tenantID uint64) (int64, error)
+	// hard delete with tenant or system 硬删除租户内或系统级数据（tenant_id IS NULL）
+	HardDeleteWithTenantOrSystem(ctx context.Context, id uint64, tenantID uint64) (int64, error)
 	// hard delete by ids 硬删除批量数据
 	HardDeleteByIDs(ctx context.Context, ids []uint64) error
+	// hard delete by ids with tenant 硬删除租户内批量数据
+	HardDeleteByIDsWithTenant(ctx context.Context, ids []uint64, tenantID uint64) (int64, error)
+	// hard delete by ids with tenant or system 硬删除租户内或系统级批量数据（tenant_id IS NULL）
+	HardDeleteByIDsWithTenantOrSystem(ctx context.Context, ids []uint64, tenantID uint64) (int64, error)
 
 	// get by id 查询单个数据
 	GetByID(ctx context.Context, id uint64, opts ...QueryOption) (*T, error)
+	// get by id with tenant 查询租户内单个数据
+	GetByIDWithTenant(ctx context.Context, id uint64, tenantID uint64, opts ...QueryOption) (*T, error)
 	// get by ids 查询批量数据
 	GetByIDs(ctx context.Context, ids []uint64, opts ...QueryOption) ([]*T, error)
 	// get one 查询单个数据
@@ -77,6 +95,15 @@ func (r *BaseRepoImpl[T]) GetByID(ctx context.Context, id uint64, opts ...QueryO
 	return &entity, nil
 }
 
+func (r *BaseRepoImpl[T]) GetByIDWithTenant(ctx context.Context, id uint64, tenantID uint64, opts ...QueryOption) (*T, error) {
+	db := ApplyQueryOptions(r.db.WithContext(ctx), opts...)
+	var entity T
+	if err := db.Where("id = ? AND tenant_id = ?", id, tenantID).First(&entity).Error; err != nil {
+		return nil, err
+	}
+	return &entity, nil
+}
+
 func (r *BaseRepoImpl[T]) GetByIDs(ctx context.Context, ids []uint64, opts ...QueryOption) ([]*T, error) {
 	db := ApplyQueryOptions(r.db.WithContext(ctx), opts...)
 	var entities []*T
@@ -96,6 +123,22 @@ func (r *BaseRepoImpl[T]) CreateBatch(ctx context.Context, entities []*T) error 
 
 func (r *BaseRepoImpl[T]) UpdateByMap(ctx context.Context, id uint64, entity map[string]any) error {
 	return r.db.WithContext(ctx).Model(new(T)).Where("id = ?", id).Updates(entity).Error
+}
+
+func (r *BaseRepoImpl[T]) UpdateByMapWithTenant(ctx context.Context, id uint64, tenantID uint64, entity map[string]any) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Model(new(T)).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Updates(entity)
+	return result.RowsAffected, result.Error
+}
+
+func (r *BaseRepoImpl[T]) UpdateByMapWithTenantOrSystem(ctx context.Context, id uint64, tenantID uint64, entity map[string]any) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Model(new(T)).
+		Where("id = ? AND (tenant_id = ? OR tenant_id IS NULL)", id, tenantID).
+		Updates(entity)
+	return result.RowsAffected, result.Error
 }
 
 func (r *BaseRepoImpl[T]) UpdateByZeroFields(ctx context.Context, id uint64, entity *T) error {
@@ -132,16 +175,62 @@ func (r *BaseRepoImpl[T]) SoftDelete(ctx context.Context, id uint64) error {
 	return r.db.WithContext(ctx).Delete(new(T), id).Error
 }
 
+func (r *BaseRepoImpl[T]) SoftDeleteWithTenant(ctx context.Context, id uint64, tenantID uint64) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Delete(new(T))
+	return result.RowsAffected, result.Error
+}
+
 func (r *BaseRepoImpl[T]) SoftDeleteByIDs(ctx context.Context, ids []uint64) error {
 	return r.db.WithContext(ctx).Delete(new(T), ids).Error
+}
+
+func (r *BaseRepoImpl[T]) SoftDeleteByIDsWithTenant(ctx context.Context, ids []uint64, tenantID uint64) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("id IN ? AND tenant_id = ?", ids, tenantID).
+		Delete(new(T))
+	return result.RowsAffected, result.Error
 }
 
 func (r *BaseRepoImpl[T]) HardDelete(ctx context.Context, id uint64) error {
 	return r.db.WithContext(ctx).Unscoped().Delete(new(T), id).Error
 }
 
+func (r *BaseRepoImpl[T]) HardDeleteWithTenant(ctx context.Context, id uint64, tenantID uint64) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("id = ? AND tenant_id = ?", id, tenantID).
+		Unscoped().
+		Delete(new(T))
+	return result.RowsAffected, result.Error
+}
+
+func (r *BaseRepoImpl[T]) HardDeleteWithTenantOrSystem(ctx context.Context, id uint64, tenantID uint64) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("id = ? AND (tenant_id = ? OR tenant_id IS NULL)", id, tenantID).
+		Unscoped().
+		Delete(new(T))
+	return result.RowsAffected, result.Error
+}
+
 func (r *BaseRepoImpl[T]) HardDeleteByIDs(ctx context.Context, ids []uint64) error {
 	return r.db.WithContext(ctx).Unscoped().Delete(new(T), ids).Error
+}
+
+func (r *BaseRepoImpl[T]) HardDeleteByIDsWithTenant(ctx context.Context, ids []uint64, tenantID uint64) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("id IN ? AND tenant_id = ?", ids, tenantID).
+		Unscoped().
+		Delete(new(T))
+	return result.RowsAffected, result.Error
+}
+
+func (r *BaseRepoImpl[T]) HardDeleteByIDsWithTenantOrSystem(ctx context.Context, ids []uint64, tenantID uint64) (int64, error) {
+	result := r.db.WithContext(ctx).
+		Where("id IN ? AND (tenant_id = ? OR tenant_id IS NULL)", ids, tenantID).
+		Unscoped().
+		Delete(new(T))
+	return result.RowsAffected, result.Error
 }
 
 func (r *BaseRepoImpl[T]) GetOne(ctx context.Context, opts ...QueryOption) (*T, error) {

@@ -21,8 +21,6 @@ type UserRepo interface {
 	GetRolesByID(ctx context.Context, id uint64) ([]*model.UserRole, error)
 	AddTenantMembership(ctx context.Context, userID uint64, tenantID uint64) error
 	HasTenantMembership(ctx context.Context, userID uint64, tenantID uint64) (bool, error)
-	UpdateByIDAndTenant(ctx context.Context, id uint64, tenantID uint64, updates map[string]any) (int64, error)
-	SoftDeleteByIDAndTenant(ctx context.Context, id uint64, tenantID uint64) (int64, error)
 }
 
 type UserRepoImpl struct {
@@ -119,19 +117,4 @@ func (r *UserRepoImpl) HasTenantMembership(ctx context.Context, userID uint64, t
 		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
 		Count(&count).Error
 	return count > 0, err
-}
-
-func (r *UserRepoImpl) UpdateByIDAndTenant(ctx context.Context, id uint64, tenantID uint64, updates map[string]any) (int64, error) {
-	result := r.db.WithContext(ctx).
-		Model(&model.User{}).
-		Where("id = ? AND tenant_id = ?", id, tenantID).
-		Updates(updates)
-	return result.RowsAffected, result.Error
-}
-
-func (r *UserRepoImpl) SoftDeleteByIDAndTenant(ctx context.Context, id uint64, tenantID uint64) (int64, error) {
-	result := r.db.WithContext(ctx).
-		Where("id = ? AND tenant_id = ?", id, tenantID).
-		Delete(&model.User{})
-	return result.RowsAffected, result.Error
 }
