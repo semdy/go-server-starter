@@ -51,9 +51,14 @@ func (s *DeadLetterServiceImpl) Alert(ctx context.Context, info taskq.AlertInfo)
 
 // Store persists a dead letter to MySQL.
 func (s *DeadLetterServiceImpl) Store(ctx context.Context, info taskq.AlertInfo) {
-	var tenantID *uint64
-	if tid := cctx.GetTenantID(ctx); tid != 0 {
-		tenantID = &tid
+	tenantID := info.TenantID
+	if tenantID == nil {
+		if tid := cctx.GetTenantID(ctx); tid != 0 {
+			tenantID = &tid
+		}
+	}
+	if tenantID != nil && *tenantID == 0 {
+		tenantID = nil
 	}
 	dl := &model.DeadLetter{
 		TenantID: tenantID,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+
 	"go-server-starter/internal/config"
 
 	"github.com/hibiken/asynq"
@@ -17,7 +18,9 @@ type ServerConfig struct {
 }
 
 // Server wraps an Asynq server with pre-configured mux, error handling, and alerting.
-type alerterPtr struct{ v atomic.Pointer[Alerter] }
+type alerterPtr struct {
+	v atomic.Pointer[Alerter]
+}
 
 func (a *alerterPtr) get() Alerter {
 	if p := a.v.Load(); p != nil {
@@ -25,7 +28,10 @@ func (a *alerterPtr) get() Alerter {
 	}
 	return noopAlerter{}
 }
-func (a *alerterPtr) set(impl Alerter) { a.v.Store(&impl) }
+
+func (a *alerterPtr) set(impl Alerter) {
+	a.v.Store(&impl)
+}
 
 type Server struct {
 	*asynq.Server
@@ -67,6 +73,7 @@ func NewServer(redisConfig config.AsynQConfig, cfg ServerConfig, logger *zap.Log
 					a.get().Alert(ctx, AlertInfo{
 						TaskType: task.Type(),
 						TaskID:   task.ResultWriter().TaskID(),
+						TenantID: TenantIDFromPayload(task.Payload()),
 						Payload:  task.Payload(),
 						Error:    err.Error(),
 						Attempt:  retried,
@@ -88,7 +95,9 @@ func NewServer(redisConfig config.AsynQConfig, cfg ServerConfig, logger *zap.Log
 }
 
 // SetAlerter replaces the active alerter. Safe for concurrent use.
-func (s *Server) SetAlerter(impl Alerter) { s.alerter.set(impl) }
+func (s *Server) SetAlerter(impl Alerter) {
+	s.alerter.set(impl)
+}
 
 // Handle registers a task handler for the given pattern.
 func (s *Server) Handle(pattern string, handler asynq.Handler) {

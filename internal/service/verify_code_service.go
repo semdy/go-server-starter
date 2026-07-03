@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"go-server-starter/internal/constant"
+	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/exception"
 	"go-server-starter/pkg/taskq"
@@ -50,9 +51,11 @@ func (s *VerifyCodeServiceImpl) SendSmsCode(ctx context.Context, params dto.Send
 
 	// Enqueue SMS send task (idempotent within 5 min cooldown window)
 	if s.taskq != nil {
+		tenantID := tenantIDFromContext(ctx)
 		task, _ := taskq.NewSendSMSCodeTask(taskq.SendSMSCodePayload{
-			Mobile: params.Mobile,
-			Code:   code,
+			TenantID: tenantID,
+			Mobile:   params.Mobile,
+			Code:     code,
 		})
 		if task != nil {
 			s.taskq.EnqueueUnique(ctx, task,
@@ -76,9 +79,11 @@ func (s *VerifyCodeServiceImpl) SendEmailCode(ctx context.Context, params dto.Se
 
 	// Enqueue email code send task (idempotent within 5 min cooldown window)
 	if s.taskq != nil {
+		tenantID := tenantIDFromContext(ctx)
 		task, _ := taskq.NewSendEmailCodeTask(taskq.SendEmailCodePayload{
-			Email: params.Email,
-			Code:  code,
+			TenantID: tenantID,
+			Email:    params.Email,
+			Code:     code,
 		})
 		if task != nil {
 			s.taskq.EnqueueUnique(ctx, task,
@@ -87,6 +92,13 @@ func (s *VerifyCodeServiceImpl) SendEmailCode(ctx context.Context, params dto.Se
 				taskq.RetryByType(taskq.TaskSendEmailCode)...,
 			)
 		}
+	}
+	return nil
+}
+
+func tenantIDFromContext(ctx context.Context) *uint64 {
+	if tid := cctx.GetTenantID(ctx); tid != 0 {
+		return &tid
 	}
 	return nil
 }

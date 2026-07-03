@@ -22,21 +22,36 @@ const (
 
 // EmailWelcomePayload is the payload for welcome email tasks.
 type EmailWelcomePayload struct {
-	UserUniCode string `json:"userUniCode"`
-	Email       string `json:"email"`
-	Nickname    string `json:"nickname"`
+	TenantID    *uint64 `json:"tenantId,omitempty"`
+	UserUniCode string  `json:"userUniCode"`
+	Email       string  `json:"email"`
+	Nickname    string  `json:"nickname"`
 }
 
 // SendSMSCodePayload is the payload for sending an SMS verification code.
 type SendSMSCodePayload struct {
-	Mobile string `json:"mobile"`
-	Code   string `json:"code"`
+	TenantID *uint64 `json:"tenantId,omitempty"`
+	Mobile   string  `json:"mobile"`
+	Code     string  `json:"code"`
 }
 
 // SendEmailCodePayload is the payload for sending an email verification code.
 type SendEmailCodePayload struct {
-	Email string `json:"email"`
-	Code  string `json:"code"`
+	TenantID *uint64 `json:"tenantId,omitempty"`
+	Email    string  `json:"email"`
+	Code     string  `json:"code"`
+}
+
+// TenantIDFromPayload extracts tenant_id from a task payload when present.
+func TenantIDFromPayload(payload []byte) *uint64 {
+	var tenantPayload struct {
+		TenantID *uint64 `json:"tenantId"`
+	}
+	if err := json.Unmarshal(payload, &tenantPayload); err != nil || tenantPayload.TenantID == nil || *tenantPayload.TenantID == 0 {
+		return nil
+	}
+	tenantID := *tenantPayload.TenantID
+	return &tenantID
 }
 
 // ----- Handler dependencies (injected at startup) -----
@@ -44,7 +59,7 @@ type SendEmailCodePayload struct {
 // HandlerDeps holds the dependencies task handlers need.
 // Set these before registering handlers in app.go.
 var HandlerDeps struct {
-	Logger *zap.Logger
+	Logger      *zap.Logger
 	EmailSender interface {
 		SendEmail(ctx context.Context, to, subject, bodyHTML string) error
 	}
@@ -191,12 +206,13 @@ type Alerter interface {
 
 // AlertInfo contains details about a task that failed permanently.
 type AlertInfo struct {
-	TaskType string `json:"taskType"`
-	TaskID   string `json:"taskId"`
-	Payload  []byte `json:"payload"`
-	Error    string `json:"error"`
-	Attempt  int    `json:"attempt"`
-	MaxRetry int    `json:"maxRetry"`
+	TaskType string  `json:"taskType"`
+	TaskID   string  `json:"taskId"`
+	TenantID *uint64 `json:"tenantId,omitempty"`
+	Payload  []byte  `json:"payload"`
+	Error    string  `json:"error"`
+	Attempt  int     `json:"attempt"`
+	MaxRetry int     `json:"maxRetry"`
 }
 
 // noopAlerter is the default, discards alerts.

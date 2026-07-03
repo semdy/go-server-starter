@@ -113,6 +113,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		// Enqueue welcome email for new user (idempotent, fire-and-forget)
 		if s.taskq != nil && user.Email != "" {
 			task, _ := taskq.NewEmailWelcomeTask(taskq.EmailWelcomePayload{
+				TenantID:    &user.TenantID,
 				UserUniCode: user.UniCode,
 				Email:       user.Email,
 				Nickname:    user.Nickname,
