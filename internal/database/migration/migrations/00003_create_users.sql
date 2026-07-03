@@ -7,7 +7,7 @@ CREATE TABLE users (
     version BIGINT UNSIGNED DEFAULT 0,
     uni_code VARCHAR(64) NOT NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
-    tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    tenant_id BIGINT UNSIGNED NOT NULL,
     email VARCHAR(255),
     mobile VARCHAR(32),
     country_code VARCHAR(8),

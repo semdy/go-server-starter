@@ -1,6 +1,9 @@
 package ctx
 
-import "context"
+import (
+	"context"
+	"go-server-starter/internal/exception"
+)
 
 type tenantKey struct{}
 
@@ -13,4 +16,13 @@ func WithTenant(ctx context.Context, tenantID uint64) context.Context {
 func GetTenantID(ctx context.Context) uint64 {
 	v, _ := ctx.Value(tenantKey{}).(uint64)
 	return v
+}
+
+// GetTenantID extracts tenant_id from a context.Context. Returns 0 and an exception if not set.
+func GetTenantIDRequired(ctx context.Context) (uint64, *exception.Exception) {
+	tid, ok := ctx.Value(tenantKey{}).(uint64)
+	if !ok || tid == 0 {
+		return 0, exception.Forbidden.Append("tenant not found")
+	}
+	return tid, nil
 }
