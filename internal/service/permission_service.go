@@ -173,8 +173,14 @@ func (s *PermissionServiceImpl) GetTable(ctx context.Context, params dto.Permiss
 func (s *PermissionServiceImpl) DeleteAccessCache(ctx context.Context, uniCode string) {
 	for _, pattern := range []string{"auth:roles:*:" + uniCode, "auth:permissions:*:" + uniCode} {
 		keys, err := s.redis.Keys(ctx, pattern).Result()
-		if err == nil && len(keys) > 0 {
-			_ = s.redis.Del(ctx, keys...).Err()
+		if err != nil {
+			s.logger.Warn("failed to find user access cache keys", zap.String("pattern", pattern), zap.Error(err))
+			continue
+		}
+		if len(keys) > 0 {
+			if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+				s.logger.Warn("failed to delete user access cache", zap.String("pattern", pattern), zap.Error(err))
+			}
 		}
 	}
 }
@@ -185,10 +191,13 @@ func (s *PermissionServiceImpl) InvalidateAllAccessCaches(ctx context.Context) {
 		for {
 			keys, next, err := s.redis.Scan(ctx, cursor, pattern, 100).Result()
 			if err != nil {
-				return
+				s.logger.Warn("failed to scan access cache keys", zap.String("pattern", pattern), zap.Error(err))
+				break
 			}
 			if len(keys) > 0 {
-				_ = s.redis.Del(ctx, keys...).Err()
+				if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+					s.logger.Warn("failed to delete access cache", zap.String("pattern", pattern), zap.Error(err))
+				}
 			}
 			cursor = next
 			if cursor == 0 {

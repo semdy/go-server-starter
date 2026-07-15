@@ -33,7 +33,7 @@ type UserRoleService interface {
 	Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Delete(ctx context.Context, id uint64) *exception.Exception
-	InvalidateAllRoleCaches(ctx context.Context)
+	InvalidateAllAccessCaches(ctx context.Context)
 	DeleteRoleCache(ctx context.Context, uniCode string)
 }
 
@@ -257,7 +257,7 @@ func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCre
 	}); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	s.InvalidateAllRoleCaches(ctx)
+	s.InvalidateAllAccessCaches(ctx)
 	return s.GetByID(ctx, role.ID)
 }
 
@@ -302,7 +302,7 @@ func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.
 			return nil, exception.UserRoleNotFound
 		}
 	}
-	s.InvalidateAllRoleCaches(ctx)
+	s.InvalidateAllAccessCaches(ctx)
 	return s.GetByID(ctx, id)
 }
 
@@ -320,7 +320,7 @@ func (s *UserRoleServiceImpl) SetPermissions(ctx context.Context, id uint64, par
 	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, role.ID, params.PermissionIDs); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	s.InvalidateAllRoleCaches(ctx)
+	s.InvalidateAllAccessCaches(ctx)
 	return s.GetByID(ctx, id)
 }
 
@@ -339,11 +339,11 @@ func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.
 	if rows == 0 {
 		return exception.UserRoleNotFound
 	}
-	s.InvalidateAllRoleCaches(ctx)
+	s.InvalidateAllAccessCaches(ctx)
 	return nil
 }
 
-func (s *UserRoleServiceImpl) InvalidateAllRoleCaches(ctx context.Context) {
+func (s *UserRoleServiceImpl) InvalidateAllAccessCaches(ctx context.Context) {
 	if s.access != nil {
 		s.access.InvalidateAllAccessCaches(ctx)
 	}
