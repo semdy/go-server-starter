@@ -40,6 +40,8 @@ func (r *Router) SetupRoutes() {
 
 	// UserRole - 角色管理（管理员）
 	r.SetupUserRoleRoutes()
+
+	// Permission - 权限管理
 	r.SetupPermissionRoutes()
 
 	// Admin DeadLetters - 死信管理（MySQL 落库 + 重试）
