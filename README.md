@@ -320,12 +320,10 @@ internal/database/migration/migrations/
   ├── 00001_create_user_roles.sql
   ├── 00002_create_tenants.sql
   ├── 00003_create_users.sql
-  ├── 00004_create_user_role_refs.sql
-  ├── 00005_create_dead_letters.sql
-  ├── 00006_create_user_tenant_refs.sql
-  ├── 00007_alter_user_roles_for_tenants.sql
-  ├── 00008_create_permissions.sql
-  └── 00009_create_user_tenant_role_refs.sql
+  ├── 00004_create_user_tenant_refs.sql
+  ├── 00005_create_user_tenant_role_refs.sql
+  ├── 00006_create_permissions.sql
+  └── 00007_create_dead_letters.sql
 ```
 
 ### Adding a new table

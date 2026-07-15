@@ -22,5 +22,5 @@ CREATE TABLE role_permission_refs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- +goose Down
-DROP TABLE role_permission_refs;
-DROP TABLE permissions;
+DROP TABLE IF EXISTS role_permission_refs;
+DROP TABLE IF EXISTS permissions;
