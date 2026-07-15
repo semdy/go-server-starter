@@ -24,7 +24,8 @@ type PermissionService interface {
 	GetMyAccess(ctx context.Context, uniCode string) (*dto.MyAccessResDto, *exception.Exception)
 	GetTable(ctx context.Context, params dto.PermissionTableQueryReqDto) (*dto.PaginationResDto[[]*dto.PermissionResDto], *exception.Exception)
 	DeleteAccessCache(ctx context.Context, uniCode string)
-	InvalidateAllAccessCaches(ctx context.Context)
+	DeleteTenantAccessCache(ctx context.Context, tenantID uint64, uniCode string)
+	InvalidateTenantAccessCaches(ctx context.Context, tenantID uint64)
 }
 
 type PermissionServiceImpl struct {
@@ -185,8 +186,23 @@ func (s *PermissionServiceImpl) DeleteAccessCache(ctx context.Context, uniCode s
 	}
 }
 
-func (s *PermissionServiceImpl) InvalidateAllAccessCaches(ctx context.Context) {
-	for _, pattern := range []string{"auth:roles:*", "auth:permissions:*"} {
+func (s *PermissionServiceImpl) DeleteTenantAccessCache(ctx context.Context, tenantID uint64, uniCode string) {
+	keys := []string{
+		constant.RedisKeyOfAuthRoles(tenantID, uniCode),
+		constant.RedisKeyOfAuthPermissions(tenantID, uniCode),
+	}
+	if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+		s.logger.Warn("failed to delete tenant user access cache",
+			zap.Uint64("tenantID", tenantID), zap.String("uniCode", uniCode), zap.Error(err))
+	}
+}
+
+func (s *PermissionServiceImpl) InvalidateTenantAccessCaches(ctx context.Context, tenantID uint64) {
+	patterns := []string{
+		constant.RedisKeyOfAuthRoles(tenantID, "*"),
+		constant.RedisKeyOfAuthPermissions(tenantID, "*"),
+	}
+	for _, pattern := range patterns {
 		var cursor uint64
 		for {
 			keys, next, err := s.redis.Scan(ctx, cursor, pattern, 100).Result()

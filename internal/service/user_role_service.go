@@ -33,8 +33,9 @@ type UserRoleService interface {
 	Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Delete(ctx context.Context, id uint64) *exception.Exception
-	InvalidateAllAccessCaches(ctx context.Context)
-	DeleteRoleCache(ctx context.Context, uniCode string)
+	InvalidateTenantAccessCaches(ctx context.Context, tenantID uint64)
+	DeleteAccessCache(ctx context.Context, uniCode string)
+	DeleteTenantAccessCache(ctx context.Context, tenantID uint64, uniCode string)
 }
 
 type UserRoleServiceImpl struct {
@@ -257,7 +258,7 @@ func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCre
 	}); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	s.InvalidateAllAccessCaches(ctx)
+	s.InvalidateTenantAccessCaches(ctx, tenantID)
 	return s.GetByID(ctx, role.ID)
 }
 
@@ -302,7 +303,7 @@ func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.
 			return nil, exception.UserRoleNotFound
 		}
 	}
-	s.InvalidateAllAccessCaches(ctx)
+	s.InvalidateTenantAccessCaches(ctx, cctx.GetTenantID(ctx))
 	return s.GetByID(ctx, id)
 }
 
@@ -320,7 +321,7 @@ func (s *UserRoleServiceImpl) SetPermissions(ctx context.Context, id uint64, par
 	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, role.ID, params.PermissionIDs); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	s.InvalidateAllAccessCaches(ctx)
+	s.InvalidateTenantAccessCaches(ctx, cctx.GetTenantID(ctx))
 	return s.GetByID(ctx, id)
 }
 
@@ -339,18 +340,24 @@ func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.
 	if rows == 0 {
 		return exception.UserRoleNotFound
 	}
-	s.InvalidateAllAccessCaches(ctx)
+	s.InvalidateTenantAccessCaches(ctx, cctx.GetTenantID(ctx))
 	return nil
 }
 
-func (s *UserRoleServiceImpl) InvalidateAllAccessCaches(ctx context.Context) {
+func (s *UserRoleServiceImpl) InvalidateTenantAccessCaches(ctx context.Context, tenantID uint64) {
 	if s.access != nil {
-		s.access.InvalidateAllAccessCaches(ctx)
+		s.access.InvalidateTenantAccessCaches(ctx, tenantID)
 	}
 }
 
-func (s *UserRoleServiceImpl) DeleteRoleCache(ctx context.Context, uniCode string) {
+func (s *UserRoleServiceImpl) DeleteAccessCache(ctx context.Context, uniCode string) {
 	if s.access != nil {
 		s.access.DeleteAccessCache(ctx, uniCode)
+	}
+}
+
+func (s *UserRoleServiceImpl) DeleteTenantAccessCache(ctx context.Context, tenantID uint64, uniCode string) {
+	if s.access != nil {
+		s.access.DeleteTenantAccessCache(ctx, tenantID, uniCode)
 	}
 }

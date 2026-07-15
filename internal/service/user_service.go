@@ -284,7 +284,7 @@ func (s *UserServiceImpl) UserUpdate(ctx context.Context, id uint64, params dto.
 	}
 	// Invalidate role cache so disabled users take effect immediately
 	if !user.Active && s.roleService != nil {
-		s.roleService.DeleteRoleCache(ctx, user.UniCode)
+		s.roleService.DeleteAccessCache(ctx, user.UniCode)
 	}
 	return userToInfoDto(user), nil
 }
@@ -309,7 +309,7 @@ func (s *UserServiceImpl) UserDelete(ctx context.Context, id uint64) *exception.
 		return exception.UserNotFound
 	}
 	if s.roleService != nil {
-		s.roleService.DeleteRoleCache(ctx, user.UniCode)
+		s.roleService.DeleteAccessCache(ctx, user.UniCode)
 	}
 	return nil
 }
@@ -362,7 +362,7 @@ func (s *UserServiceImpl) SetRoles(ctx context.Context, id uint64, params dto.Us
 	if err := s.repo.UserRole().ReplaceUserRoles(ctx, user.ID, tenantID, params.RoleIDs); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	s.roleService.DeleteRoleCache(ctx, user.UniCode)
+	s.roleService.DeleteTenantAccessCache(ctx, tenantID, user.UniCode)
 	if exc := s.loadRoles(ctx, user); exc != nil {
 		return nil, exc
 	}

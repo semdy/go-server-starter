@@ -112,9 +112,9 @@ func (s *TenantServiceImpl) Update(ctx context.Context, id uint64, params dto.Te
 	if err := s.repo.Tenant().UpdateByZeroFields(ctx, id, t); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	// If deactivated, invalidate all role caches so affected users are blocked immediately
+	// If deactivated, invalidate this tenant's access caches so affected users are blocked immediately.
 	if params.Active != nil && !*params.Active && s.roleService != nil {
-		s.roleService.InvalidateAllAccessCaches(ctx)
+		s.roleService.InvalidateTenantAccessCaches(ctx, id)
 	}
 	return toTenantResDto(t), nil
 }
@@ -124,7 +124,7 @@ func (s *TenantServiceImpl) Delete(ctx context.Context, id uint64) *exception.Ex
 		return exception.InternalServerError.Append(err.Error())
 	}
 	if s.roleService != nil {
-		s.roleService.InvalidateAllAccessCaches(ctx)
+		s.roleService.InvalidateTenantAccessCaches(ctx, id)
 	}
 	return nil
 }
