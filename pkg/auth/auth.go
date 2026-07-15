@@ -24,6 +24,8 @@ type Auth interface {
 	// String variants accept dynamic role names (e.g. tenant-specific roles).
 	RoleCheckAnyS(roles ...string) gin.HandlerFunc
 	RoleCheckAllS(roles ...string) gin.HandlerFunc
+	PermissionCheckAny(permissions ...string) gin.HandlerFunc
+	PermissionCheckAll(permissions ...string) gin.HandlerFunc
 }
 
 type AuthImpl struct {
@@ -48,7 +50,11 @@ func (a *AuthImpl) RoleCheck(roleCheckType RoleCheckType, requiredRoles ...enum.
 			ctx.ToError(exc)
 			return
 		}
-		if !a.checkRoles(roleCheckType, userRoles, requiredRoles) {
+		required := make([]string, len(requiredRoles))
+		for i, role := range requiredRoles {
+			required[i] = role.String()
+		}
+		if !checkValues(roleCheckType, userRoles, required) {
 			a.logger.Warn("role check failed", zap.Any("userRoles", userRoles), zap.Any("requiredRoles", requiredRoles))
 			ctx.ToError(exception.Forbidden)
 			return
@@ -58,29 +64,29 @@ func (a *AuthImpl) RoleCheck(roleCheckType RoleCheckType, requiredRoles ...enum.
 }
 
 // checkRoles 检查用户角色是否满足要求
-func (a *AuthImpl) checkRoles(checkType RoleCheckType, userRoles, requiredRoles []enum.RoleCode) bool {
-	if len(requiredRoles) == 0 {
+func checkValues(checkType RoleCheckType, actual, required []string) bool {
+	if len(required) == 0 {
 		return true
 	}
 
-	userRoleSet := make(map[enum.RoleCode]struct{}, len(userRoles))
-	for _, role := range userRoles {
-		userRoleSet[role] = struct{}{}
+	valueSet := make(map[string]struct{}, len(actual))
+	for _, value := range actual {
+		valueSet[value] = struct{}{}
 	}
 
 	switch checkType {
 	case RoleCheckTypeAny:
 		// 任意一个角色符合即可
-		for _, required := range requiredRoles {
-			if _, ok := userRoleSet[required]; ok {
+		for _, value := range required {
+			if _, ok := valueSet[value]; ok {
 				return true
 			}
 		}
 		return false
 	case RoleCheckTypeAll:
 		// 所有角色都必须符合
-		for _, required := range requiredRoles {
-			if _, ok := userRoleSet[required]; !ok {
+		for _, value := range required {
+			if _, ok := valueSet[value]; !ok {
 				return false
 			}
 		}
@@ -88,6 +94,36 @@ func (a *AuthImpl) checkRoles(checkType RoleCheckType, userRoles, requiredRoles 
 	default:
 		return false
 	}
+}
+
+func (a *AuthImpl) permissionCheck(checkType RoleCheckType, required []string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		appCtx := ctx.FromGinCtx(c)
+		uniCode, exc := appCtx.GetUserUniCode()
+		if exc != nil {
+			appCtx.ToError(exc)
+			return
+		}
+		permissions, exc := a.service.Permission().GetCachedPermissionCodesByUniCode(appCtx.Ctx, uniCode)
+		if exc != nil {
+			appCtx.ToError(exc)
+			return
+		}
+		if !checkValues(checkType, permissions, required) {
+			a.logger.Warn("permission check failed", zap.Strings("requiredPermissions", required))
+			appCtx.ToError(exception.Forbidden)
+			return
+		}
+		c.Next()
+	}
+}
+
+func (a *AuthImpl) PermissionCheckAny(permissions ...string) gin.HandlerFunc {
+	return a.permissionCheck(RoleCheckTypeAny, permissions)
+}
+
+func (a *AuthImpl) PermissionCheckAll(permissions ...string) gin.HandlerFunc {
+	return a.permissionCheck(RoleCheckTypeAll, permissions)
 }
 
 func (a *AuthImpl) RoleCheckAny(roles ...enum.RoleCode) gin.HandlerFunc {

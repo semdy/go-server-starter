@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"go-server-starter/internal/dto"
-	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
@@ -16,8 +15,8 @@ import (
 // testUserRepo is a stub that returns canned data for user service tests.
 type testUserRepo struct {
 	repo.UserRepo
-	userByID        *model.User
-	userByIDErr     error
+	userByID         *model.User
+	userByIDErr      error
 	userByUniCode    *model.User
 	userByUniCodeErr error
 }
@@ -50,13 +49,14 @@ type testRepo struct {
 	userRoleRepo repo.UserRoleRepo
 }
 
-func (r *testRepo) DB() *gorm.DB                             { return nil }
-func (r *testRepo) Logger() *zap.Logger                      { return zap.NewNop() }
+func (r *testRepo) DB() *gorm.DB                                                   { return nil }
+func (r *testRepo) Logger() *zap.Logger                                            { return zap.NewNop() }
 func (r *testRepo) Transaction(_ context.Context, _ func(tx *gorm.DB) error) error { return nil }
-func (r *testRepo) User() repo.UserRepo                      { return r.userRepo }
-func (r *testRepo) UserRole() repo.UserRoleRepo              { return r.userRoleRepo }
-func (r *testRepo) DeadLetter() repo.DeadLetterRepo          { return nil }
-func (r *testRepo) Tenant() repo.TenantRepo                   { return nil }
+func (r *testRepo) User() repo.UserRepo                                            { return r.userRepo }
+func (r *testRepo) UserRole() repo.UserRoleRepo                                    { return r.userRoleRepo }
+func (r *testRepo) Permission() repo.PermissionRepo                                { return nil }
+func (r *testRepo) DeadLetter() repo.DeadLetterRepo                                { return nil }
+func (r *testRepo) Tenant() repo.TenantRepo                                        { return nil }
 
 func sampleUser() *model.User {
 	return &model.User{
@@ -65,15 +65,20 @@ func sampleUser() *model.User {
 		Mobile:      "13800138000",
 		CountryCode: "86",
 		Nickname:    "TestUser",
-		Roles: []model.UserRole{
-			{Code: enum.RoleCodeUser, Enabled: true},
-		},
 	}
+}
+
+type testUserRoleRepo struct {
+	repo.UserRoleRepo
+}
+
+func (r *testUserRoleRepo) GetRolesByUserAndTenant(_ context.Context, _, _ uint64) ([]*model.UserRole, error) {
+	return []*model.UserRole{{Code: "user", Enabled: true}}, nil
 }
 
 func newTestUserService(userRepo repo.UserRepo) UserService {
 	return NewUserService(
-		&testRepo{userRepo: userRepo, userRoleRepo: &stubUserRoleRepo{}},
+		&testRepo{userRepo: userRepo, userRoleRepo: &testUserRoleRepo{}},
 		nil, // redis
 		nil, // roleService
 		zap.NewNop(),

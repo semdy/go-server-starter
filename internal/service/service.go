@@ -15,6 +15,7 @@ import (
 type Service interface {
 	User() UserService
 	UserRole() UserRoleService
+	Permission() PermissionService
 	Auth() AuthService
 	VerifyCode() VerifyCodeService
 	DeadLetter() DeadLetterService
@@ -30,6 +31,7 @@ type ServiceImpl struct {
 	logger            *zap.Logger
 	userService       UserService
 	userRoleService   UserRoleService
+	permissionService PermissionService
 	authService       AuthService
 	verifyCodeService VerifyCodeService
 	deadLetterService DeadLetterService
@@ -37,7 +39,8 @@ type ServiceImpl struct {
 }
 
 func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.Client, snowflake *snowflake.Snowflake, repo repo.Repo, taskqClient *taskq.Client, logger *zap.Logger) Service {
-	userRoleService := NewUserRoleService(repo, redis, logger)
+	permissionService := NewPermissionService(repo, redis, logger)
+	userRoleService := NewUserRoleService(repo, redis, permissionService, logger)
 	return &ServiceImpl{
 		db:                db,
 		config:            config,
@@ -47,7 +50,8 @@ func NewService(db *gorm.DB, config *config.Config, jwt *jwt.JWT, redis *redis.C
 		logger:            logger,
 		userService:       NewUserService(repo, redis, userRoleService, logger),
 		userRoleService:   userRoleService,
-		authService:       NewAuthService(repo, jwt, taskqClient, logger),
+		permissionService: permissionService,
+		authService:       NewAuthService(repo, jwt, permissionService, taskqClient, logger),
 		verifyCodeService: NewVerifyCodeService(redis.Client, taskqClient, logger),
 		deadLetterService: NewDeadLetterService(repo, taskqClient, logger),
 		tenantService:     NewTenantService(repo, snowflake, userRoleService, logger),
@@ -60,6 +64,10 @@ func (s *ServiceImpl) User() UserService {
 
 func (s *ServiceImpl) UserRole() UserRoleService {
 	return s.userRoleService
+}
+
+func (s *ServiceImpl) Permission() PermissionService {
+	return s.permissionService
 }
 
 func (s *ServiceImpl) Auth() AuthService {

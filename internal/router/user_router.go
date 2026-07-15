@@ -1,7 +1,7 @@
 package router
 
 import (
-	"go-server-starter/internal/enum"
+	"go-server-starter/internal/constant"
 )
 
 func (r *Router) SetupUserRoutes() {
@@ -18,14 +18,14 @@ func (r *Router) SetupUserRoutes() {
 
 		// Admin: user management — user-based, 120/min
 		admin := router.Group("/admin")
-		admin.Use(r.auth.RoleCheckAny(enum.RoleCodeAdmin, enum.RoleCodeSuperAdmin))
 		admin.Use(r.ratelimit.RateLimitByUser(120, "ADMIN-USER"))
 		{
-			admin.GET("/table", r.handler.User().GetTable)
-			admin.GET("/:id", r.handler.User().GetInfoByID)
-			admin.POST("", r.handler.User().UserCreate)
-			admin.PUT("/:id", r.handler.User().UserUpdate)
-			admin.DELETE("/:id", r.handler.User().UserDelete)
+			admin.GET("/table", r.auth.PermissionCheckAny(constant.PermissionUserRead), r.handler.User().GetTable)
+			admin.GET("/:id", r.auth.PermissionCheckAny(constant.PermissionUserRead), r.handler.User().GetInfoByID)
+			admin.POST("", r.auth.PermissionCheckAny(constant.PermissionUserCreate), r.handler.User().UserCreate)
+			admin.PUT("/:id", r.auth.PermissionCheckAny(constant.PermissionUserUpdate), r.handler.User().UserUpdate)
+			admin.PUT("/:id/roles", r.auth.PermissionCheckAny(constant.PermissionUserAssignRoles), r.handler.User().SetRoles)
+			admin.DELETE("/:id", r.auth.PermissionCheckAny(constant.PermissionUserDelete), r.handler.User().UserDelete)
 		}
 	}
 }

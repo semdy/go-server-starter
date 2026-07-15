@@ -13,7 +13,7 @@ type User struct {
 	Salt        string     `json:"-"`
 	Nickname    string     `json:"nickname"`
 	AvatarURL   string     `json:"avatarURL"`
-	Roles       []UserRole `gorm:"many2many:user_role_refs" json:"roles"`
+	Roles       []UserRole `gorm:"-" json:"roles"`
 	Tenants     []Tenant   `gorm:"many2many:user_tenant_refs" json:"tenants,omitempty"`
 }
 

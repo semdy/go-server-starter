@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
@@ -20,7 +21,7 @@ import (
 type AuthService interface {
 	LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 	LoginByEmailAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
-	SwitchTenant(ctx context.Context, uniCode string, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception)
+	SwitchTenant(ctx context.Context, uniCode string, deviceType enum.DeviceType, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 }
 
 type AuthServiceImpl struct {
@@ -28,10 +29,11 @@ type AuthServiceImpl struct {
 	jwt    *jwt.JWT
 	taskq  *taskq.Client
 	logger *zap.Logger
+	access PermissionService
 }
 
-func NewAuthService(repo repo.Repo, jwt *jwt.JWT, taskq *taskq.Client, logger *zap.Logger) AuthService {
-	return &AuthServiceImpl{repo: repo, jwt: jwt, taskq: taskq, logger: logger}
+func NewAuthService(repo repo.Repo, jwt *jwt.JWT, access PermissionService, taskq *taskq.Client, logger *zap.Logger) AuthService {
+	return &AuthServiceImpl{repo: repo, jwt: jwt, access: access, taskq: taskq, logger: logger}
 }
 
 // loginOrRegister looks up a user, returns their tenant_id from DB, or auto-generates one for new users.
@@ -77,7 +79,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		}
 
 		// Bind default "user" role
-		role, err := userRoleRepo.GetOne(ctx, repo.Where("code = ?", enum.RoleCodeUser))
+		role, err := userRoleRepo.GetOne(ctx, repo.Where("tenant_id = 0 AND code = ?", enum.RoleCodeUser.String()))
 		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
@@ -96,13 +98,15 @@ func (s *AuthServiceImpl) loginOrRegister(
 		user = newUser(uniCode)
 		user.TenantID = defaultTenant.ID
 		user.Active = true
-		user.Roles = []model.UserRole{*role}
-
 		if err := userRepo.Create(ctx, user); err != nil {
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
 		if err := userRepo.AddTenantMembership(ctx, user.ID, defaultTenant.ID); err != nil {
+			tx.Rollback()
+			return nil, exception.InternalServerError.Append(err.Error())
+		}
+		if err := userRoleRepo.AddUserRole(ctx, user.ID, defaultTenant.ID, role.ID); err != nil {
 			tx.Rollback()
 			return nil, exception.InternalServerError.Append(err.Error())
 		}
@@ -132,7 +136,16 @@ func (s *AuthServiceImpl) loginOrRegister(
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 
-	return &dto.AuthTokenResDto{Token: token}, nil
+	res := &dto.AuthTokenResDto{Token: token, Roles: []string{}, Permissions: []string{}}
+	if s.access != nil {
+		access, exc := s.access.GetMyAccess(cctx.WithTenant(ctx, user.TenantID), user.UniCode)
+		if exc != nil {
+			return nil, exc
+		}
+		res.Roles = access.Roles
+		res.Permissions = access.Permissions
+	}
+	return res, nil
 }
 
 func (s *AuthServiceImpl) LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
@@ -166,7 +179,7 @@ func (s *AuthServiceImpl) LoginByEmailAndCode(ctx context.Context, deviceType en
 	)
 }
 
-func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
+func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, deviceType enum.DeviceType, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
 	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -192,9 +205,18 @@ func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, para
 		return nil, exception.Forbidden.Append("user is not a member of this tenant")
 	}
 
-	token, tokenErr := s.jwt.GenerateToken(user.UniCode, tenant.ID, enum.DeviceTypeWeb)
+	token, tokenErr := s.jwt.GenerateToken(user.UniCode, tenant.ID, deviceType)
 	if tokenErr != nil {
 		return nil, exception.InternalServerError.Append(tokenErr.Error())
 	}
-	return &dto.AuthTokenResDto{Token: token}, nil
+	res := &dto.AuthTokenResDto{Token: token, Roles: []string{}, Permissions: []string{}}
+	if s.access != nil {
+		access, exc := s.access.GetMyAccess(cctx.WithTenant(ctx, tenant.ID), user.UniCode)
+		if exc != nil {
+			return nil, exc
+		}
+		res.Roles = access.Roles
+		res.Permissions = access.Permissions
+	}
+	return res, nil
 }

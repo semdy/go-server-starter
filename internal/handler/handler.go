@@ -12,6 +12,7 @@ type Handler interface {
 	Hello() HelloHandler
 	User() UserHandler
 	UserRole() UserRoleHandler
+	Permission() PermissionHandler
 	Auth() AuthHandler
 	DeadLetter() DeadLetterHandler
 	Health() HealthHandler
@@ -23,6 +24,7 @@ type HandlerImpl struct {
 	helloHandler      HelloHandler
 	userHandler       UserHandler
 	userRoleHandler   UserRoleHandler
+	permissionHandler PermissionHandler
 	authHandler       AuthHandler
 	deadLetterHandler DeadLetterHandler
 	healthHandler     HealthHandler
@@ -35,6 +37,7 @@ func NewHandler(service service.Service, db *database.DB, redis *redis.Client, l
 		helloHandler:      NewHelloHandler(logger),
 		userHandler:       NewUserHandler(logger, service),
 		userRoleHandler:   NewUserRoleHandler(logger, service),
+		permissionHandler: NewPermissionHandler(logger, service),
 		authHandler:       NewAuthHandler(logger, service),
 		deadLetterHandler: NewDeadLetterHandler(logger, service),
 		healthHandler:     NewHealthHandler(logger, db, redis),
@@ -45,6 +48,7 @@ func NewHandler(service service.Service, db *database.DB, redis *redis.Client, l
 func (h *HandlerImpl) Hello() HelloHandler           { return h.helloHandler }
 func (h *HandlerImpl) User() UserHandler             { return h.userHandler }
 func (h *HandlerImpl) UserRole() UserRoleHandler     { return h.userRoleHandler }
+func (h *HandlerImpl) Permission() PermissionHandler { return h.permissionHandler }
 func (h *HandlerImpl) Auth() AuthHandler             { return h.authHandler }
 func (h *HandlerImpl) DeadLetter() DeadLetterHandler { return h.deadLetterHandler }
 func (h *HandlerImpl) Health() HealthHandler         { return h.healthHandler }

@@ -551,6 +551,28 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/my-access": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前租户下的角色代码和权限代码，供前端控制入口显示。",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "当前用户访问能力",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.MyAccessResDto"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/send-email-code": {
             "post": {
                 "description": "向指定邮箱发送登录验证码。60 秒内不可重复请求。",
@@ -730,6 +752,54 @@ const docTemplate = `{
                 }
             }
         },
+        "/permission/table": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "分页查询可分配的权限代码。",
+                "tags": [
+                    "permission"
+                ],
+                "summary": "权限字典",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "权限代码",
+                        "name": "code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "是否启用",
+                        "name": "enabled",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页条数",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_PermissionResDto"
+                        }
+                    }
+                }
+            }
+        },
         "/role": {
             "post": {
                 "security": [
@@ -737,7 +807,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "创建新的角色。需要 admin 或 super_admin 角色。",
+                "description": "在当前租户创建自定义角色，可配置当前用户持有的权限。需要 role.create 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -783,7 +853,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "分页查询角色列表，支持按 code 和 enabled 筛选。需要 admin 或 super_admin 角色。",
+                "description": "分页查询系统内置角色和当前租户自定义角色。需要 role.read 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -839,7 +909,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "根据 ID 查询角色详情。需要 admin 或 super_admin 角色。",
+                "description": "根据 ID 查询系统内置角色或当前租户自定义角色详情。需要 role.read 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -881,7 +951,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "更新角色代码或启用状态。需要 admin 或 super_admin 角色。",
+                "description": "更新当前租户自定义角色；内置角色不可修改。需要 role.update 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -932,7 +1002,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "软删除指定角色。需要 admin 或 super_admin 角色。",
+                "description": "删除当前租户自定义角色并清理授权关系；内置角色不可删除。需要 role.delete 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -942,7 +1012,7 @@ const docTemplate = `{
                 "tags": [
                     "role"
                 ],
-                "summary": "删除角色（软删除）",
+                "summary": "删除角色",
                 "parameters": [
                     {
                         "type": "integer",
@@ -963,6 +1033,46 @@ const docTemplate = `{
                 }
             }
         },
+        "/role/{id}/permissions": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "替换当前租户自定义角色的权限；内置角色不可修改。",
+                "tags": [
+                    "role"
+                ],
+                "summary": "配置角色权限",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "权限 ID 列表",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleSetPermissionsReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleResDto"
+                        }
+                    }
+                }
+            }
+        },
         "/user/admin": {
             "post": {
                 "security": [
@@ -970,7 +1080,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "在管理员所属租户下创建用户。同一租户内 email 不可重复。需 admin+ 角色。",
+                "description": "在当前租户创建用户并绑定默认 user 角色。需要 user.create 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1016,7 +1126,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "分页查询用户列表，支持按昵称、邮箱、手机号筛选。需 admin+ 角色。",
+                "description": "分页查询当前租户用户，支持按昵称、邮箱、手机号筛选。需要 user.read 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1098,7 +1208,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "根据 ID 查询任意用户详情。需 admin+ 角色。",
+                "description": "根据 ID 查询当前租户用户详情。需要 user.read 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1140,7 +1250,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "管理员更新任意用户的昵称、头像、简介。需 admin+ 角色。",
+                "description": "更新当前租户用户的昵称、头像、简介。需要 user.update 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1191,7 +1301,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "软删除用户，自动校验与管理员属于同一租户。需 admin+ 角色。",
+                "description": "软删除当前租户用户。需要 user.delete 权限。",
                 "consumes": [
                     "application/json"
                 ],
@@ -1217,6 +1327,46 @@ const docTemplate = `{
                         "schema": {
                             "type": "object",
                             "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/user/admin/{id}/roles": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "替换用户在当前租户下的角色列表。",
+                "tags": [
+                    "user"
+                ],
+                "summary": "分配用户角色",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "用户 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "角色 ID 列表",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserSetRolesReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserInfoResDto"
                         }
                     }
                 }
@@ -1340,6 +1490,18 @@ const docTemplate = `{
         "go-server-starter_internal_dto.AuthTokenResDto": {
             "type": "object",
             "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "token": {
                     "type": "string"
                 }
@@ -1394,6 +1556,23 @@ const docTemplate = `{
                 }
             }
         },
+        "go-server-starter_internal_dto.MyAccessResDto": {
+            "type": "object",
+            "properties": {
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem": {
             "type": "object",
             "properties": {
@@ -1401,6 +1580,32 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/go-server-starter_internal_dto.DeadLetterItem"
+                    }
+                },
+                "hasNext": {
+                    "type": "boolean"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "pageSize": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "totalPage": {
+                    "type": "integer"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_PermissionResDto": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.PermissionResDto"
                     }
                 },
                 "hasNext": {
@@ -1495,6 +1700,26 @@ const docTemplate = `{
                 },
                 "totalPage": {
                     "type": "integer"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.PermissionResDto": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -1680,26 +1905,48 @@ const docTemplate = `{
         "go-server-starter_internal_dto.UserRoleCreateReqDto": {
             "type": "object",
             "required": [
-                "code"
+                "code",
+                "name"
             ],
             "properties": {
                 "code": {
                     "type": "string",
                     "maxLength": 50,
-                    "minLength": 1
+                    "minLength": 2
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2
+                },
+                "permissionIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
         "go-server-starter_internal_dto.UserRoleResDto": {
             "type": "object",
             "properties": {
+                "builtIn": {
+                    "type": "boolean"
+                },
                 "code": {
                     "type": "string"
                 },
                 "createdAt": {
+                    "type": "string"
+                },
+                "description": {
                     "type": "string"
                 },
                 "enabled": {
@@ -1708,8 +1955,31 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.PermissionResDto"
+                    }
+                },
+                "tenantId": {
+                    "type": "integer"
+                },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserRoleSetPermissionsReqDto": {
+            "type": "object",
+            "properties": {
+                "permissionIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },
@@ -1719,10 +1989,30 @@ const docTemplate = `{
                 "code": {
                     "type": "string",
                     "maxLength": 50,
-                    "minLength": 1
+                    "minLength": 2
+                },
+                "description": {
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "enabled": {
                     "type": "boolean"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 2
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserSetRolesReqDto": {
+            "type": "object",
+            "properties": {
+                "roleIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
                 }
             }
         },

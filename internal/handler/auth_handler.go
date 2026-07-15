@@ -16,6 +16,7 @@ type AuthHandler interface {
 	SendSmsCode(c *gin.Context)
 	SendEmailCode(c *gin.Context)
 	SwitchTenant(c *gin.Context)
+	MyAccess(c *gin.Context)
 }
 
 type AuthHandlerImpl struct {
@@ -161,9 +162,31 @@ func (h *AuthHandlerImpl) SwitchTenant(c *gin.Context) {
 		appCtx.ToError(err)
 		return
 	}
-	res, err := h.service.Auth().SwitchTenant(appCtx.Ctx, uniCode, params)
+	res, err := h.service.Auth().SwitchTenant(appCtx.Ctx, uniCode, appCtx.GetDeviceType(), params)
 	if err != nil {
 		appCtx.ToError(err)
+		return
+	}
+	appCtx.ToSuccess(res)
+}
+
+// MyAccess godoc
+// @Summary 当前用户访问能力
+// @Description 返回当前租户下的角色代码和权限代码，供前端控制入口显示。
+// @Tags auth
+// @Security BearerAuth
+// @Success 200 {object} dto.MyAccessResDto
+// @Router /auth/my-access [get]
+func (h *AuthHandlerImpl) MyAccess(c *gin.Context) {
+	appCtx := ctx.FromGinCtx(c)
+	uniCode, exc := appCtx.GetUserUniCode()
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	res, exc := h.service.Permission().GetMyAccess(appCtx.Ctx, uniCode)
+	if exc != nil {
+		appCtx.ToError(exc)
 		return
 	}
 	appCtx.ToSuccess(res)

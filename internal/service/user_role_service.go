@@ -2,305 +2,311 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"go-server-starter/internal/constant"
+	"regexp"
+	"time"
+
 	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
-	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/utils"
-	"time"
 
-	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
-	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
+var roleCodePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{1,49}$`)
+
 type UserRoleService interface {
-	GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception)
-	GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception)
+	GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception)
+	GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception)
 	GetByID(ctx context.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception)
 	GetTable(ctx context.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception)
 	Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
+	SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Delete(ctx context.Context, id uint64) *exception.Exception
 	InvalidateAllRoleCaches(ctx context.Context)
 	DeleteRoleCache(ctx context.Context, uniCode string)
 }
 
 type UserRoleServiceImpl struct {
-	repo    repo.Repo
-	redis   *redis.Client
-	logger  *zap.Logger
-	sfGroup singleflight.Group // deduplicates concurrent cache-miss DB queries
+	repo   repo.Repo
+	redis  *redis.Client
+	access PermissionService
+	logger *zap.Logger
 }
 
-func NewUserRoleService(repo repo.Repo, redis *redis.Client, logger *zap.Logger) UserRoleService {
-	return &UserRoleServiceImpl{
-		repo:   repo,
-		redis:  redis,
-		logger: logger,
-	}
+func NewUserRoleService(repo repo.Repo, redis *redis.Client, access PermissionService, logger *zap.Logger) UserRoleService {
+	return &UserRoleServiceImpl{repo: repo, redis: redis, access: access, logger: logger}
 }
 
-func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
+func (s *UserRoleServiceImpl) activeUserID(ctx context.Context, uniCode string) (uint64, *exception.Exception) {
 	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, exception.Unauthorized.Append("user not found or disabled")
+			return 0, exception.Unauthorized.Append("user not found")
 		}
-		s.logger.Error("get user by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
-		return nil, exception.InternalServerError.Append(err.Error())
+		return 0, exception.InternalServerError.Append(err.Error())
 	}
-
 	if !user.Active {
-		return nil, exception.Unauthorized.Append("user is disabled")
+		return 0, exception.Unauthorized.Append("user is disabled")
 	}
-
 	tenantID := cctx.GetTenantID(ctx)
-	if tenantID == 0 {
-		return nil, exception.Unauthorized.Append("tenant not found")
-	}
-
 	isMember := user.TenantID == tenantID
 	if !isMember {
-		var memberErr error
-		isMember, memberErr = s.repo.User().HasTenantMembership(ctx, user.ID, tenantID)
-		if memberErr != nil {
-			return nil, exception.InternalServerError.Append(memberErr.Error())
-		}
+		isMember, err = s.repo.User().HasTenantMembership(ctx, user.ID, tenantID)
 	}
-	if !isMember {
-		return nil, exception.Unauthorized.Append("user is not a member of tenant")
-	}
-
-	// Check tenant is active
-	tenant, tenantErr := s.repo.Tenant().GetByID(ctx, tenantID)
-	if tenantErr != nil && !errors.Is(tenantErr, gorm.ErrRecordNotFound) {
-		return nil, exception.InternalServerError.Append(tenantErr.Error())
-	}
-	if tenant == nil || !tenant.Active {
-		return nil, exception.Unauthorized.Append("tenant is disabled or deleted")
-	}
-
-	rolesCode := make([]enum.RoleCode, 0, len(user.Roles))
-	for _, role := range user.Roles {
-		if role.Enabled {
-			rolesCode = append(rolesCode, role.Code)
-		}
-	}
-	return rolesCode, nil
-}
-
-func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]enum.RoleCode, *exception.Exception) {
-	cacheKey := constant.RedisKeyOfAuthRoles(cctx.GetTenantID(ctx), uniCode)
-
-	dataStr, err := s.redis.Get(ctx, cacheKey).Result()
-	if err == nil {
-		// Cache hit — deserialize and return
-		var roles []enum.RoleCode
-		if err := json.Unmarshal([]byte(dataStr), &roles); err != nil {
-			s.logger.Error("unmarshal roles code by uni code failed", zap.String("uniCode", uniCode), zap.Error(err))
-			return nil, exception.InternalServerError.Append(err.Error())
-		}
-		return roles, nil
-	}
-
-	if !errors.Is(err, goredis.Nil) {
-		s.logger.Warn("redis unavailable, falling back to DB",
-			zap.String("uniCode", uniCode), zap.Error(err))
-		// Fall through to singleflight — don't bypass it
-	}
-
-	// Cache miss or Redis unavailable — use singleflight to deduplicate concurrent DB queries
-	result, sfErr, _ := s.sfGroup.Do(cacheKey, func() (any, error) {
-		roles, exc := s.GetRolesCodeByUniCode(ctx, uniCode)
-		if exc != nil {
-			return nil, exc // *exception.Exception implements error
-		}
-
-		rolesJSON, err := json.Marshal(roles)
-		if err != nil {
-			s.logger.Error("failed to marshal roles for cache", zap.String("uniCode", uniCode), zap.Error(err))
-			return nil, err
-		}
-
-		if setErr := s.redis.Set(ctx, cacheKey, rolesJSON, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil {
-			s.logger.Warn("failed to set role cache", zap.String("uniCode", uniCode), zap.Error(setErr))
-			return roles, nil
-		}
-
-		return roles, nil
-	})
-
-	if sfErr != nil {
-		// singleflight returned our *exception.Exception as an error
-		if exc, ok := sfErr.(*exception.Exception); ok {
-			return nil, exc
-		}
-		return nil, exception.InternalServerError.Append(sfErr.Error())
-	}
-
-	return result.([]enum.RoleCode), nil
-}
-
-func (s *UserRoleServiceImpl) DeleteRoleCache(ctx context.Context, uniCode string) {
-	pattern := "auth:roles:*:" + uniCode
-	keys, err := s.redis.Keys(ctx, pattern).Result()
 	if err != nil {
-		s.logger.Warn("failed to find role cache keys", zap.String("uniCode", uniCode), zap.Error(err))
-		return
+		return 0, exception.InternalServerError.Append(err.Error())
 	}
-	if len(keys) == 0 {
-		return
+	if tenantID == 0 || !isMember {
+		return 0, exception.Unauthorized.Append("user is not a member of tenant")
 	}
-	if err := s.redis.Del(ctx, keys...).Err(); err != nil {
-		s.logger.Warn("failed to delete role cache", zap.String("uniCode", uniCode), zap.Error(err))
+	return user.ID, nil
+}
+
+func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception) {
+	userID, exc := s.activeUserID(ctx, uniCode)
+	if exc != nil {
+		return nil, exc
+	}
+	roles, err := s.repo.UserRole().GetRolesByUserAndTenant(ctx, userID, cctx.GetTenantID(ctx))
+	if err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	codes := make([]string, len(roles))
+	for i, role := range roles {
+		codes[i] = role.Code
+	}
+	return codes, nil
+}
+
+func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception) {
+	return s.GetRolesCodeByUniCode(ctx, uniCode)
+}
+
+func permissionRes(permission model.Permission) dto.PermissionResDto {
+	return dto.PermissionResDto{
+		ID: permission.ID, Code: permission.Code, Name: permission.Name,
+		Description: permission.Description, Enabled: permission.Enabled,
 	}
 }
 
-// InvalidateAllRoleCaches removes all role cache entries from Redis.
-func (s *UserRoleServiceImpl) InvalidateAllRoleCaches(ctx context.Context) {
-	pattern := "auth:roles:*"
-	var cursor uint64
-	var totalDeleted int64
-
-	for {
-		keys, nextCursor, err := s.redis.Scan(ctx, cursor, pattern, 100).Result()
-		if err != nil {
-			s.logger.Warn("failed to scan role cache keys for invalidation", zap.Error(err))
-			return
-		}
-		if len(keys) > 0 {
-			deleted, err := s.redis.Del(ctx, keys...).Result()
-			if err != nil {
-				s.logger.Warn("failed to delete role cache keys", zap.Error(err))
-			}
-			totalDeleted += deleted
-		}
-		cursor = nextCursor
-		if cursor == 0 {
-			break
-		}
+func roleToDto(role *model.UserRole) *dto.UserRoleResDto {
+	permissions := make([]dto.PermissionResDto, len(role.Permissions))
+	for i, permission := range role.Permissions {
+		permissions[i] = permissionRes(permission)
 	}
-
-	if totalDeleted > 0 {
-		s.logger.Info("invalidated role caches", zap.Int64("count", totalDeleted))
+	createdAt, updatedAt := "", ""
+	if role.CreatedAt != nil {
+		createdAt = role.CreatedAt.Format(time.RFC3339)
 	}
-}
-
-// toUserRoleResDto converts a model.UserRole to a response DTO.
-func toUserRoleResDto(role *model.UserRole) *dto.UserRoleResDto {
+	if role.UpdatedAt != nil {
+		updatedAt = role.UpdatedAt.Format(time.RFC3339)
+	}
 	return &dto.UserRoleResDto{
-		ID:        role.ID,
-		Code:      role.Code.String(),
-		Enabled:   role.Enabled,
-		CreatedAt: role.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: role.UpdatedAt.Format(time.RFC3339),
+		ID: role.ID, TenantID: role.TenantID, Code: role.Code, Name: role.Name,
+		Description: role.Description, BuiltIn: role.BuiltIn, Enabled: role.Enabled,
+		Permissions: permissions, CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}
 }
 
-func (s *UserRoleServiceImpl) GetByID(ctx context.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception) {
-	role, err := s.repo.UserRole().GetByID(ctx, id)
+func (s *UserRoleServiceImpl) scopedRole(ctx context.Context, id uint64, preload bool) (*model.UserRole, *exception.Exception) {
+	opts := []repo.QueryOption{repo.Where("id = ? AND (tenant_id = 0 OR tenant_id = ?)", id, cctx.GetTenantID(ctx))}
+	if preload {
+		opts = append(opts, repo.Preload("Permissions"))
+	}
+	role, err := s.repo.UserRole().GetOne(ctx, opts...)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 	if role == nil {
 		return nil, exception.UserRoleNotFound
 	}
-	return toUserRoleResDto(role), nil
+	return role, nil
+}
+
+func (s *UserRoleServiceImpl) GetByID(ctx context.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception) {
+	role, exc := s.scopedRole(ctx, id, true)
+	if exc != nil {
+		return nil, exc
+	}
+	return roleToDto(role), nil
 }
 
 func (s *UserRoleServiceImpl) GetTable(ctx context.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception) {
-	opts := []repo.QueryOption{
-		repo.Order("id ASC"),
-		repo.WherePtrNonEmpty("code = ?", params.Code),
-		repo.WherePtrNonEmpty("enabled = ?", params.Enabled),
-	}
-	roles, total, err := s.repo.UserRole().GetTable(ctx, params.Page, params.PageSize, opts...)
+	roles, total, err := s.repo.UserRole().GetTable(ctx, params.Page, params.PageSize,
+		repo.Where("tenant_id = 0 OR tenant_id = ?", cctx.GetTenantID(ctx)),
+		repo.Preload("Permissions"), repo.Order("built_in DESC, code ASC"),
+		repo.WherePtrNonEmpty("code = ?", params.Code), repo.WherePtrNonEmpty("enabled = ?", params.Enabled))
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 	res := make([]*dto.UserRoleResDto, len(roles))
 	for i, role := range roles {
-		res[i] = toUserRoleResDto(role)
+		res[i] = roleToDto(role)
 	}
 	return utils.AssemblePaginationResDto(res, total, params.Page, params.PageSize), nil
 }
 
-func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
-	code, err := enum.ParseRoleCode(params.Code)
-	if err != nil {
-		return nil, exception.InvalidParam.Append("invalid role code: " + params.Code)
+func (s *UserRoleServiceImpl) validatePermissionIDs(ctx context.Context, ids []uint64) *exception.Exception {
+	if len(ids) == 0 {
+		return nil
 	}
+	permissions, err := s.repo.Permission().GetByIDs(ctx, ids, repo.Where("enabled = ?", true))
+	if err != nil {
+		return exception.InternalServerError.Append(err.Error())
+	}
+	if len(permissions) != len(ids) {
+		return exception.InvalidParam.Append("one or more permissions do not exist or are disabled")
+	}
+	actor := cctx.GetUserUniCodeFromContext(ctx)
+	if actor == "" || s.access == nil {
+		return exception.Forbidden.Append("authorization identity not found")
+	}
+	actorPermissions, exc := s.access.GetCachedPermissionCodesByUniCode(ctx, actor)
+	if exc != nil {
+		return exc
+	}
+	allowed := make(map[string]struct{}, len(actorPermissions))
+	for _, code := range actorPermissions {
+		allowed[code] = struct{}{}
+	}
+	for _, permission := range permissions {
+		if _, ok := allowed[permission.Code]; !ok {
+			return exception.Forbidden.Append("cannot grant permission not held by current user: " + permission.Code)
+		}
+	}
+	return nil
+}
 
-	// Check if role already exists
-	existing, err := s.repo.UserRole().GetOne(ctx, repo.Where("code = ?", code))
+func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
+	if !roleCodePattern.MatchString(params.Code) {
+		return nil, exception.InvalidParam.Append("role code must match ^[a-z][a-z0-9_]{1,49}$")
+	}
+	tenantID := cctx.GetTenantID(ctx)
+	existing, err := s.repo.UserRole().GetOne(ctx, repo.Where("tenant_id = ? AND code = ?", tenantID, params.Code))
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 	if existing != nil {
 		return nil, exception.UserRoleAlreadyExists
 	}
-
+	if exc := s.validatePermissionIDs(ctx, params.PermissionIDs); exc != nil {
+		return nil, exc
+	}
 	enabled := true
 	if params.Enabled != nil {
 		enabled = *params.Enabled
 	}
-
-	role := &model.UserRole{Code: code, Enabled: enabled}
-	if err := s.repo.UserRole().Create(ctx, role); err != nil {
+	role := &model.UserRole{TenantID: tenantID, Code: params.Code, Name: params.Name, Description: params.Description, Enabled: enabled}
+	if err := s.repo.Transaction(ctx, func(tx *gorm.DB) error {
+		roleRepo := s.repo.UserRole().WithTx(tx)
+		if err := roleRepo.Create(ctx, role); err != nil {
+			return err
+		}
+		return roleRepo.ReplaceRolePermissions(ctx, role.ID, params.PermissionIDs)
+	}); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-
-	// Invalidate role caches so any cached role lists reflect the new role
 	s.InvalidateAllRoleCaches(ctx)
-
-	return toUserRoleResDto(role), nil
+	return s.GetByID(ctx, role.ID)
 }
 
 func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
-	role, err := s.repo.UserRole().GetByID(ctx, id)
-	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, exception.InternalServerError.Append(err.Error())
+	role, exc := s.scopedRole(ctx, id, false)
+	if exc != nil {
+		return nil, exc
 	}
-	if role == nil {
-		return nil, exception.UserRoleNotFound
+	if role.BuiltIn || role.TenantID == 0 {
+		return nil, exception.Forbidden.Append("built-in roles cannot be modified")
 	}
-
+	updates := map[string]any{}
 	if params.Code != nil {
-		code, err := enum.ParseRoleCode(*params.Code)
-		if err != nil {
-			return nil, exception.InvalidParam.Append("invalid role code: " + *params.Code)
+		if !roleCodePattern.MatchString(*params.Code) {
+			return nil, exception.InvalidParam.Append("invalid role code")
 		}
-		role.Code = code
+		existing, err := s.repo.UserRole().GetOne(ctx,
+			repo.Where("tenant_id = ? AND code = ? AND id <> ?", cctx.GetTenantID(ctx), *params.Code, id))
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.InternalServerError.Append(err.Error())
+		}
+		if existing != nil {
+			return nil, exception.UserRoleAlreadyExists
+		}
+		updates["code"] = *params.Code
+	}
+	if params.Name != nil {
+		updates["name"] = *params.Name
+	}
+	if params.Description != nil {
+		updates["description"] = *params.Description
 	}
 	if params.Enabled != nil {
-		role.Enabled = *params.Enabled
+		updates["enabled"] = *params.Enabled
 	}
+	if len(updates) > 0 {
+		rows, err := s.repo.UserRole().UpdateByMapWithTenant(ctx, id, cctx.GetTenantID(ctx), updates)
+		if err != nil {
+			return nil, exception.InternalServerError.Append(err.Error())
+		}
+		if rows == 0 {
+			return nil, exception.UserRoleNotFound
+		}
+	}
+	s.InvalidateAllRoleCaches(ctx)
+	return s.GetByID(ctx, id)
+}
 
-	if err := s.repo.UserRole().UpdateByZeroFields(ctx, id, role); err != nil {
+func (s *UserRoleServiceImpl) SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRoleResDto, *exception.Exception) {
+	role, exc := s.scopedRole(ctx, id, false)
+	if exc != nil {
+		return nil, exc
+	}
+	if role.BuiltIn || role.TenantID == 0 {
+		return nil, exception.Forbidden.Append("built-in role permissions cannot be modified")
+	}
+	if exc := s.validatePermissionIDs(ctx, params.PermissionIDs); exc != nil {
+		return nil, exc
+	}
+	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, role.ID, params.PermissionIDs); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-
-	// Invalidate caches — role code or enabled status may have changed
 	s.InvalidateAllRoleCaches(ctx)
-
-	return toUserRoleResDto(role), nil
+	return s.GetByID(ctx, id)
 }
 
 func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.Exception {
-	if err := s.repo.UserRole().SoftDelete(ctx, id); err != nil {
+	role, exc := s.scopedRole(ctx, id, false)
+	if exc != nil {
+		return exc
+	}
+	if role.BuiltIn || role.TenantID == 0 {
+		return exception.Forbidden.Append("built-in roles cannot be deleted")
+	}
+	rows, err := s.repo.UserRole().HardDeleteWithTenant(ctx, id, cctx.GetTenantID(ctx))
+	if err != nil {
 		return exception.InternalServerError.Append(err.Error())
 	}
-
-	// Invalidate caches — deleted role should no longer appear in user role lists
+	if rows == 0 {
+		return exception.UserRoleNotFound
+	}
 	s.InvalidateAllRoleCaches(ctx)
-
 	return nil
+}
+
+func (s *UserRoleServiceImpl) InvalidateAllRoleCaches(ctx context.Context) {
+	if s.access != nil {
+		s.access.InvalidateAllAccessCaches(ctx)
+	}
+}
+
+func (s *UserRoleServiceImpl) DeleteRoleCache(ctx context.Context, uniCode string) {
+	if s.access != nil {
+		s.access.DeleteAccessCache(ctx, uniCode)
+	}
 }

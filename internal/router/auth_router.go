@@ -9,5 +9,6 @@ func (r *Router) SetupAuthRoutes() {
 		router.POST("/send-sms-code", r.handler.Auth().SendSmsCode)
 		router.POST("/send-email-code", r.handler.Auth().SendEmailCode)
 		router.POST("/switch-tenant", r.jwt.JWT(), r.handler.Auth().SwitchTenant)
+		router.GET("/my-access", r.jwt.JWT(), r.handler.Auth().MyAccess)
 	}
 }

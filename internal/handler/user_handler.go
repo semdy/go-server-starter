@@ -17,6 +17,7 @@ type UserHandler interface {
 	UserCreate(c *gin.Context)
 	UserUpdate(c *gin.Context)
 	UserDelete(c *gin.Context)
+	SetRoles(c *gin.Context)
 }
 
 type UserHandlerImpl struct {
@@ -86,7 +87,7 @@ func (h *UserHandlerImpl) UpdateMyInfo(c *gin.Context) {
 
 // GetTable godoc
 // @Summary      用户列表（管理员）
-// @Description  分页查询用户列表，支持按昵称、邮箱、手机号筛选。需 admin+ 角色。
+// @Description  分页查询当前租户用户，支持按昵称、邮箱、手机号筛选。需要 user.read 权限。
 // @Tags         user
 // @Accept       json
 // @Produce      json
@@ -118,7 +119,7 @@ func (h *UserHandlerImpl) GetTable(c *gin.Context) {
 
 // GetInfoByID godoc
 // @Summary      查询用户（管理员）
-// @Description  根据 ID 查询任意用户详情。需 admin+ 角色。
+// @Description  根据 ID 查询当前租户用户详情。需要 user.read 权限。
 // @Tags         user
 // @Accept       json
 // @Produce      json
@@ -144,7 +145,7 @@ func (h *UserHandlerImpl) GetInfoByID(c *gin.Context) {
 
 // UserCreate godoc
 // @Summary      创建用户（管理员）
-// @Description  在管理员所属租户下创建用户。同一租户内 email 不可重复。需 admin+ 角色。
+// @Description  在当前租户创建用户并绑定默认 user 角色。需要 user.create 权限。
 // @Tags         user
 // @Accept       json
 // @Produce      json
@@ -170,7 +171,7 @@ func (h *UserHandlerImpl) UserCreate(c *gin.Context) {
 
 // UserUpdate godoc
 // @Summary      更新用户（管理员）
-// @Description  管理员更新任意用户的昵称、头像、简介。需 admin+ 角色。
+// @Description  更新当前租户用户的昵称、头像、简介。需要 user.update 权限。
 // @Tags         user
 // @Accept       json
 // @Produce      json
@@ -202,7 +203,7 @@ func (h *UserHandlerImpl) UserUpdate(c *gin.Context) {
 
 // UserDelete godoc
 // @Summary      删除用户（管理员）
-// @Description  软删除用户，自动校验与管理员属于同一租户。需 admin+ 角色。
+// @Description  软删除当前租户用户。需要 user.delete 权限。
 // @Tags         user
 // @Accept       json
 // @Produce      json
@@ -222,4 +223,33 @@ func (h *UserHandlerImpl) UserDelete(c *gin.Context) {
 		return
 	}
 	appCtx.ToSuccess(nil)
+}
+
+// SetRoles godoc
+// @Summary 分配用户角色
+// @Description 替换用户在当前租户下的角色列表。
+// @Tags user
+// @Security BearerAuth
+// @Param id path int true "用户 ID"
+// @Param body body dto.UserSetRolesReqDto true "角色 ID 列表"
+// @Success 200 {object} dto.UserInfoResDto
+// @Router /user/admin/{id}/roles [put]
+func (h *UserHandlerImpl) SetRoles(c *gin.Context) {
+	appCtx := ctx.FromGinCtx(c)
+	id, exc := appCtx.GetPathParamID("id")
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	var params dto.UserSetRolesReqDto
+	if exc := appCtx.ShouldBind(&params); exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	res, exc := h.service.User().SetRoles(appCtx.Ctx, id, params)
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	appCtx.ToSuccess(res)
 }

@@ -1,9 +1,12 @@
 package model
 
-import "go-server-starter/internal/enum"
-
 type UserRole struct {
 	Model
-	Code    enum.RoleCode `json:"code"`
-	Enabled bool          `json:"enabled"`
+	TenantID    uint64       `json:"tenantId"`
+	Code        string       `json:"code"`
+	Name        string       `json:"name"`
+	Description string       `json:"description"`
+	BuiltIn     bool         `json:"builtIn"`
+	Enabled     bool         `json:"enabled"`
+	Permissions []Permission `gorm:"many2many:role_permission_refs" json:"permissions,omitempty"`
 }

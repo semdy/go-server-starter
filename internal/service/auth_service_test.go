@@ -17,13 +17,14 @@ type mockRepo struct {
 	userRoleRepo repo.UserRoleRepo
 }
 
-func (m *mockRepo) DB() *gorm.DB                             { return nil }
-func (m *mockRepo) Logger() *zap.Logger                      { return zap.NewNop() }
+func (m *mockRepo) DB() *gorm.DB                                                   { return nil }
+func (m *mockRepo) Logger() *zap.Logger                                            { return zap.NewNop() }
 func (m *mockRepo) Transaction(_ context.Context, _ func(tx *gorm.DB) error) error { return nil }
-func (m *mockRepo) User() repo.UserRepo                      { return m.userRepo }
-func (m *mockRepo) UserRole() repo.UserRoleRepo              { return m.userRoleRepo }
-func (m *mockRepo) DeadLetter() repo.DeadLetterRepo          { return nil }
-func (m *mockRepo) Tenant() repo.TenantRepo                   { return nil }
+func (m *mockRepo) User() repo.UserRepo                                            { return m.userRepo }
+func (m *mockRepo) UserRole() repo.UserRoleRepo                                    { return m.userRoleRepo }
+func (m *mockRepo) Permission() repo.PermissionRepo                                { return nil }
+func (m *mockRepo) DeadLetter() repo.DeadLetterRepo                                { return nil }
+func (m *mockRepo) Tenant() repo.TenantRepo                                        { return nil }
 
 type stubUserRepo struct {
 	repo.UserRepo
@@ -51,7 +52,8 @@ func TestNewAuthService(t *testing.T) {
 	svc := NewAuthService(
 		&mockRepo{userRepo: &stubUserRepo{}, userRoleRepo: &stubUserRoleRepo{}},
 		testJWT(),
-		nil,   // taskq
+		nil, // access
+		nil, // taskq
 		zap.NewNop(),
 	)
 	if svc == nil {

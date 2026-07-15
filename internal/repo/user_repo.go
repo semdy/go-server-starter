@@ -17,8 +17,6 @@ type UserRepo interface {
 	GenerateUniCode(ctx context.Context) (string, error)
 	GetIDByUniCode(ctx context.Context, uniCode string) (uint64, error)
 	GetByUniCode(ctx context.Context, uniCode string) (*model.User, error)
-	GetRolesByUniCode(ctx context.Context, uniCode string) ([]*model.UserRole, error)
-	GetRolesByID(ctx context.Context, id uint64) ([]*model.UserRole, error)
 	AddTenantMembership(ctx context.Context, userID uint64, tenantID uint64) error
 	HasTenantMembership(ctx context.Context, userID uint64, tenantID uint64) (bool, error)
 }
@@ -60,7 +58,7 @@ func (r *UserRepoImpl) GenerateUniCode(ctx context.Context) (string, error) {
 
 func (r *UserRepoImpl) GetIDByUniCode(ctx context.Context, uniCode string) (uint64, error) {
 	var user model.User
-	if err := r.db.WithContext(ctx).Where("uni_code = ?", uniCode).Preload("Roles").First(&user).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("uni_code = ?", uniCode).First(&user).Error; err != nil {
 		return 0, err
 	}
 	return user.ID, nil
@@ -68,40 +66,10 @@ func (r *UserRepoImpl) GetIDByUniCode(ctx context.Context, uniCode string) (uint
 
 func (r *UserRepoImpl) GetByUniCode(ctx context.Context, uniCode string) (*model.User, error) {
 	var user model.User
-	if err := r.db.WithContext(ctx).Where("uni_code = ?", uniCode).Preload("Roles").First(&user).Error; err != nil {
+	if err := r.db.WithContext(ctx).Where("uni_code = ?", uniCode).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
-}
-
-func (r *UserRepoImpl) GetRolesByUniCode(ctx context.Context, uniCode string) ([]*model.UserRole, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).Where("uni_code = ?", uniCode).Preload("Roles").First(&user).Error; err != nil {
-		return nil, err
-	}
-	roles := make([]*model.UserRole, 0)
-	for i := range user.Roles {
-		var role = user.Roles[i]
-		if role.Enabled {
-			roles = append(roles, &role)
-		}
-	}
-	return roles, nil
-}
-
-func (r *UserRepoImpl) GetRolesByID(ctx context.Context, id uint64) ([]*model.UserRole, error) {
-	var user model.User
-	if err := r.db.WithContext(ctx).Where("id = ?", id).Preload("Roles").First(&user).Error; err != nil {
-		return nil, err
-	}
-	roles := make([]*model.UserRole, 0)
-	for i := range user.Roles {
-		var role = user.Roles[i]
-		if role.Enabled {
-			roles = append(roles, &role)
-		}
-	}
-	return roles, nil
 }
 
 func (r *UserRepoImpl) AddTenantMembership(ctx context.Context, userID uint64, tenantID uint64) error {

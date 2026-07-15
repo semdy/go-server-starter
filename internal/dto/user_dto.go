@@ -46,3 +46,7 @@ type CreateUserReqDto struct {
 	Email    string `json:"email" binding:"required,email"`
 	Nickname string `json:"nickname" binding:"required,min=2,max=20"`
 }
+
+type UserSetRolesReqDto struct {
+	RoleIDs []uint64 `json:"roleIds"`
+}

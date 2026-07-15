@@ -49,8 +49,10 @@ func (j *JWT) JWT() gin.HandlerFunc {
 		// 设置用户唯一码和租户 ID
 		ctx.SetUserUniCode(claims.UniCode)
 		ctx.SetTenantID(claims.TenantID)
-		// Inject tenant_id into context.Context for service-layer access
-		c.Request = c.Request.WithContext(cctx.WithTenant(c.Request.Context(), claims.TenantID))
+		// Inject authorization identity into context.Context for service-layer access.
+		requestCtx := cctx.WithTenant(c.Request.Context(), claims.TenantID)
+		requestCtx = cctx.WithUserUniCode(requestCtx, claims.UniCode)
+		c.Request = c.Request.WithContext(requestCtx)
 		// 判断是否需要刷新令牌
 		if j.isTokenNeedRefresh(ctx, claims.ExpiresAt.Time) {
 			// 刷新令牌

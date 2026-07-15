@@ -3,6 +3,7 @@ package seed
 import (
 	"context"
 	"errors"
+	"go-server-starter/internal/constant"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
@@ -29,6 +30,9 @@ func (s *seed) Run() error {
 		return err
 	}
 	if err := s.SeedDefaultTenant(); err != nil {
+		return err
+	}
+	if err := s.SeedPermissions(); err != nil {
 		return err
 	}
 	return nil
@@ -70,7 +74,7 @@ func (s *seed) SeedUserRole() error {
 	}
 
 	// 创建已存在角色代码的 map，用于快速查找
-	existingRoleMap := make(map[enum.RoleCode]bool)
+	existingRoleMap := make(map[string]bool)
 	for _, role := range existingRoles {
 		existingRoleMap[role.Code] = true
 	}
@@ -79,10 +83,13 @@ func (s *seed) SeedUserRole() error {
 	var newRoles []*model.UserRole
 
 	for _, roleCode := range roles {
-		if !existingRoleMap[roleCode] {
+		if !existingRoleMap[roleCode.String()] {
 			newRoles = append(newRoles, &model.UserRole{
-				Code:    roleCode,
-				Enabled: true,
+				TenantID: 0,
+				Code:     roleCode.String(),
+				Name:     roleCode.String(),
+				BuiltIn:  true,
+				Enabled:  true,
 			})
 		}
 	}
@@ -98,5 +105,57 @@ func (s *seed) SeedUserRole() error {
 		s.logger.Info("all roles already exist, no need to seed")
 	}
 
+	return nil
+}
+
+func (s *seed) SeedPermissions() error {
+	ctx := context.Background()
+	for _, definition := range constant.BuiltInPermissions {
+		permission, err := s.repo.Permission().GetOne(ctx, repo.Where("code = ?", definition.Code))
+		if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if permission == nil {
+			permission = &model.Permission{Code: definition.Code, Name: definition.Name, Enabled: true}
+			if err := s.repo.Permission().Create(ctx, permission); err != nil {
+				return err
+			}
+		}
+	}
+
+	allPermissions, err := s.repo.Permission().GetMany(ctx, repo.Where("enabled = ?", true))
+	if err != nil {
+		return err
+	}
+	permissionIDs := make(map[string]uint64, len(allPermissions))
+	allIDs := make([]uint64, 0, len(allPermissions))
+	for _, permission := range allPermissions {
+		permissionIDs[permission.Code] = permission.ID
+		allIDs = append(allIDs, permission.ID)
+	}
+
+	superAdmin, err := s.repo.UserRole().GetOne(ctx, repo.Where("tenant_id = 0 AND code = ?", enum.RoleCodeSuperAdmin.String()))
+	if err != nil {
+		return err
+	}
+	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, superAdmin.ID, allIDs); err != nil {
+		return err
+	}
+
+	admin, err := s.repo.UserRole().GetOne(ctx, repo.Where("tenant_id = 0 AND code = ?", enum.RoleCodeAdmin.String()))
+	if err != nil {
+		return err
+	}
+	adminIDs := make([]uint64, 0, len(constant.AdminPermissions))
+	for _, code := range constant.AdminPermissions {
+		if id, ok := permissionIDs[code]; ok {
+			adminIDs = append(adminIDs, id)
+		}
+	}
+	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, admin.ID, adminIDs); err != nil {
+		return err
+	}
+
+	s.logger.Info("seeded permissions and built-in role mappings")
 	return nil
 }

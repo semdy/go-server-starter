@@ -200,15 +200,18 @@ Built-in roles:
 - `user_svip` - SVIP user
 - `guest` - Guest user
 
-Protect routes with role checks:
+The six built-in roles are immutable. Tenant administrators can create custom roles and assign any permissions they currently hold. User-role assignments are scoped by tenant, so the same user can have different roles in different tenants.
+
+Protect routes with permission checks:
 
 ```go
-// Any of the specified roles
-router.GET("/admin", auth.RoleCheckAny(enum.RoleCodeAdmin, enum.RoleCodeSuperAdmin), handler)
-
-// All specified roles required
-router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
+router.GET("/users", auth.PermissionCheckAny(constant.PermissionUserRead), handler)
+router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelete), handler)
 ```
+
+Login and tenant-switch responses include `roles` and `permissions`. Clients can refresh them independently:
+
+`GET /api/auth/my-access`
 
 ## 🌐 API Endpoints
 
@@ -317,9 +320,12 @@ internal/database/migration/migrations/
   ├── 00001_create_user_roles.sql
   ├── 00002_create_tenants.sql
   ├── 00003_create_users.sql
-  └── 00004_create_user_role_refs.sql
-  └── 00005_create_dead_letters.sql
-  └── 00006_create_user_tenant_refs.sql
+  ├── 00004_create_user_role_refs.sql
+  ├── 00005_create_dead_letters.sql
+  ├── 00006_create_user_tenant_refs.sql
+  ├── 00007_alter_user_roles_for_tenants.sql
+  ├── 00008_create_permissions.sql
+  └── 00009_create_user_tenant_role_refs.sql
 ```
 
 ### Adding a new table

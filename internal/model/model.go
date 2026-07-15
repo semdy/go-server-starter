@@ -21,7 +21,7 @@ type Model struct {
 }
 
 // BeforeCreate auto-fills Snowflake ID. Tables listed in autoIncrementTables use MySQL AUTO_INCREMENT instead.
-var autoIncrementTables = map[string]bool{"user_roles": true}
+var autoIncrementTables = map[string]bool{"user_roles": true, "permissions": true}
 
 func (m *Model) BeforeCreate(tx *gorm.DB) error {
 	if m.ID == 0 && GenerateID != nil {

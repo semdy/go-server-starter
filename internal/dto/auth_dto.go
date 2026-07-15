@@ -12,7 +12,9 @@ type AuthLoginByEmailAndCodeReqDto struct {
 }
 
 type AuthTokenResDto struct {
-	Token string `json:"token"`
+	Token       string   `json:"token"`
+	Roles       []string `json:"roles"`
+	Permissions []string `json:"permissions"`
 }
 
 // SwitchTenantReqDto is the request body for switching to a different tenant.

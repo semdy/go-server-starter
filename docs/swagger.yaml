@@ -25,6 +25,14 @@ definitions:
     type: object
   go-server-starter_internal_dto.AuthTokenResDto:
     properties:
+      permissions:
+        items:
+          type: string
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
       token:
         type: string
     type: object
@@ -61,11 +69,39 @@ definitions:
       taskType:
         type: string
     type: object
+  go-server-starter_internal_dto.MyAccessResDto:
+    properties:
+      permissions:
+        items:
+          type: string
+        type: array
+      roles:
+        items:
+          type: string
+        type: array
+    type: object
   go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem:
     properties:
       data:
         items:
           $ref: '#/definitions/go-server-starter_internal_dto.DeadLetterItem'
+        type: array
+      hasNext:
+        type: boolean
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+      totalPage:
+        type: integer
+    type: object
+  go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_PermissionResDto:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.PermissionResDto'
         type: array
       hasNext:
         type: boolean
@@ -128,6 +164,19 @@ definitions:
         type: integer
       totalPage:
         type: integer
+    type: object
+  go-server-starter_internal_dto.PermissionResDto:
+    properties:
+      code:
+        type: string
+      description:
+        type: string
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
     type: object
   go-server-starter_internal_dto.RetryDeadLetterReq:
     properties:
@@ -252,34 +301,79 @@ definitions:
     properties:
       code:
         maxLength: 50
-        minLength: 1
+        minLength: 2
+        type: string
+      description:
+        maxLength: 255
         type: string
       enabled:
         type: boolean
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+      permissionIds:
+        items:
+          type: integer
+        type: array
     required:
     - code
+    - name
     type: object
   go-server-starter_internal_dto.UserRoleResDto:
     properties:
+      builtIn:
+        type: boolean
       code:
         type: string
       createdAt:
+        type: string
+      description:
         type: string
       enabled:
         type: boolean
       id:
         type: integer
+      name:
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.PermissionResDto'
+        type: array
+      tenantId:
+        type: integer
       updatedAt:
         type: string
+    type: object
+  go-server-starter_internal_dto.UserRoleSetPermissionsReqDto:
+    properties:
+      permissionIds:
+        items:
+          type: integer
+        type: array
     type: object
   go-server-starter_internal_dto.UserRoleUpdateReqDto:
     properties:
       code:
         maxLength: 50
-        minLength: 1
+        minLength: 2
+        type: string
+      description:
+        maxLength: 255
         type: string
       enabled:
         type: boolean
+      name:
+        maxLength: 100
+        minLength: 2
+        type: string
+    type: object
+  go-server-starter_internal_dto.UserSetRolesReqDto:
+    properties:
+      roleIds:
+        items:
+          type: integer
+        type: array
     type: object
   go-server-starter_internal_dto.UserUpdateInfoReqDto:
     properties:
@@ -645,6 +739,19 @@ paths:
       summary: 手机验证码登录
       tags:
       - auth
+  /auth/my-access:
+    get:
+      description: 返回当前租户下的角色代码和权限代码，供前端控制入口显示。
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.MyAccessResDto'
+      security:
+      - BearerAuth: []
+      summary: 当前用户访问能力
+      tags:
+      - auth
   /auth/send-email-code:
     post:
       consumes:
@@ -695,7 +802,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: 切换到指定租户，签发新的 JWT token（旧 token 仍有效）。用户必须属于目标租户（默认租户或 user_tenant_refs 成员关系）。
+      description: 切换到指定租户，签发新的 JWT token（旧 token 仍有效）。用户必须属于目标租户（默认租户或 user_tenant_refs
+        成员关系）。
       parameters:
       - description: 租户 ID
         in: body
@@ -762,11 +870,41 @@ paths:
       summary: 健康检查
       tags:
       - hello
+  /permission/table:
+    get:
+      description: 分页查询可分配的权限代码。
+      parameters:
+      - description: 权限代码
+        in: query
+        name: code
+        type: string
+      - description: 是否启用
+        in: query
+        name: enabled
+        type: boolean
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页条数
+        in: query
+        name: pageSize
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_PermissionResDto'
+      security:
+      - BearerAuth: []
+      summary: 权限字典
+      tags:
+      - permission
   /role:
     post:
       consumes:
       - application/json
-      description: 创建新的角色。需要 admin 或 super_admin 角色。
+      description: 在当前租户创建自定义角色，可配置当前用户持有的权限。需要 role.create 权限。
       parameters:
       - description: 角色信息
         in: body
@@ -795,7 +933,7 @@ paths:
     delete:
       consumes:
       - application/json
-      description: 软删除指定角色。需要 admin 或 super_admin 角色。
+      description: 删除当前租户自定义角色并清理授权关系；内置角色不可删除。需要 role.delete 权限。
       parameters:
       - description: 角色 ID
         in: path
@@ -812,13 +950,13 @@ paths:
             type: object
       security:
       - BearerAuth: []
-      summary: 删除角色（软删除）
+      summary: 删除角色
       tags:
       - role
     get:
       consumes:
       - application/json
-      description: 根据 ID 查询角色详情。需要 admin 或 super_admin 角色。
+      description: 根据 ID 查询系统内置角色或当前租户自定义角色详情。需要 role.read 权限。
       parameters:
       - description: 角色 ID
         in: path
@@ -845,7 +983,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: 更新角色代码或启用状态。需要 admin 或 super_admin 角色。
+      description: 更新当前租户自定义角色；内置角色不可修改。需要 role.update 权限。
       parameters:
       - description: 角色 ID
         in: path
@@ -875,11 +1013,36 @@ paths:
       summary: 更新角色
       tags:
       - role
+  /role/{id}/permissions:
+    put:
+      description: 替换当前租户自定义角色的权限；内置角色不可修改。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 权限 ID 列表
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserRoleSetPermissionsReqDto'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRoleResDto'
+      security:
+      - BearerAuth: []
+      summary: 配置角色权限
+      tags:
+      - role
   /role/table:
     get:
       consumes:
       - application/json
-      description: 分页查询角色列表，支持按 code 和 enabled 筛选。需要 admin 或 super_admin 角色。
+      description: 分页查询系统内置角色和当前租户自定义角色。需要 role.read 权限。
       parameters:
       - description: 角色代码
         in: query
@@ -915,7 +1078,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: 在管理员所属租户下创建用户。同一租户内 email 不可重复。需 admin+ 角色。
+      description: 在当前租户创建用户并绑定默认 user 角色。需要 user.create 权限。
       parameters:
       - description: 用户信息
         in: body
@@ -944,7 +1107,7 @@ paths:
     delete:
       consumes:
       - application/json
-      description: 软删除用户，自动校验与管理员属于同一租户。需 admin+ 角色。
+      description: 软删除当前租户用户。需要 user.delete 权限。
       parameters:
       - description: 用户 ID
         in: path
@@ -967,7 +1130,7 @@ paths:
     get:
       consumes:
       - application/json
-      description: 根据 ID 查询任意用户详情。需 admin+ 角色。
+      description: 根据 ID 查询当前租户用户详情。需要 user.read 权限。
       parameters:
       - description: 用户 ID
         in: path
@@ -994,7 +1157,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: 管理员更新任意用户的昵称、头像、简介。需 admin+ 角色。
+      description: 更新当前租户用户的昵称、头像、简介。需要 user.update 权限。
       parameters:
       - description: 用户 ID
         in: path
@@ -1024,11 +1187,36 @@ paths:
       summary: 更新用户（管理员）
       tags:
       - user
+  /user/admin/{id}/roles:
+    put:
+      description: 替换用户在当前租户下的角色列表。
+      parameters:
+      - description: 用户 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 角色 ID 列表
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserSetRolesReqDto'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserInfoResDto'
+      security:
+      - BearerAuth: []
+      summary: 分配用户角色
+      tags:
+      - user
   /user/admin/table:
     get:
       consumes:
       - application/json
-      description: 分页查询用户列表，支持按昵称、邮箱、手机号筛选。需 admin+ 角色。
+      description: 分页查询当前租户用户，支持按昵称、邮箱、手机号筛选。需要 user.read 权限。
       parameters:
       - description: 昵称（模糊）
         in: query
