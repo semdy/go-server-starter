@@ -190,7 +190,7 @@ if (newToken) localStorage.setItem('token', newToken)
 
 旧 token 在过期前仍然有效——重叠窗口内不会有请求被拒绝。
 
-### 基于角色的访问控制
+### 基于角色和权限的访问控制
 
 内置角色：
 - `super_admin` - 超级管理员
@@ -200,15 +200,18 @@ if (newToken) localStorage.setItem('token', newToken)
 - `user_svip` - SVIP 用户
 - `guest` - 访客
 
-使用角色检查保护路由：
+六个内置角色不可修改、不可删除，也不能通过 API 修改其权限。租户管理员可以创建当前租户的自定义角色，并为其配置自己拥有的权限。用户角色关系包含 `tenant_id`，因此同一用户可以在不同租户拥有不同角色。
+
+使用权限检查保护路由：
 
 ```go
-// 满足任一指定角色即可访问
-router.GET("/admin", auth.RoleCheckAny(enum.RoleCodeAdmin, enum.RoleCodeSuperAdmin), handler)
-
-// 需要满足所有指定角色
-router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
+router.GET("/users", auth.PermissionCheckAny(constant.PermissionUserRead), handler)
+router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelete), handler)
 ```
+
+登录和切换租户接口会同时返回当前租户下的 `roles` 和 `permissions`。前端也可以单独刷新访问能力：
+
+`GET /api/auth/my-access`
 
 ## 🌐 API 接口
 
@@ -221,28 +224,32 @@ router.GET("/super", auth.RoleCheckAll(enum.RoleCodeSuperAdmin), handler)
 | POST | `/api/auth/login/mobile` | 手机号 + 验证码登录 | 否 |
 | POST | `/api/auth/login/email` | 邮箱 + 验证码登录 | 否 |
 | POST | `/api/auth/switch-tenant` | 切换到其他租户 | 是 |
+| GET | `/api/auth/my-access` | 获取当前租户的角色和权限代码 | 是 |
 | GET | `/api/user/my-info` | 获取当前用户信息 | 是 |
 | PUT | `/api/user/my-info` | 更新当前用户信息 | 是 |
-| GET | `/api/user/admin/table` | 用户列表（分页） | admin+ |
-| GET | `/api/user/admin/{id}` | 查询用户 | admin+ |
-| POST | `/api/user/admin` | 创建用户 | admin+ |
-| PUT | `/api/user/admin/{id}` | 更新用户 | admin+ |
-| DELETE | `/api/user/admin/{id}` | 删除用户（软） | admin+ |
-| GET | `/api/role/{id}` | 查询角色 | admin+ |
-| GET | `/api/role/table` | 角色列表（分页） | admin+ |
-| POST | `/api/role` | 创建角色 | admin+ |
-| PUT | `/api/role/{id}` | 更新角色 | admin+ |
-| DELETE | `/api/role/{id}` | 删除角色（软） | admin+ |
-| GET | `/api/admin/tenants/code` | 生成租户 Code | super_admin |
-| GET | `/api/admin/tenants/{id}` | 查询租户 | super_admin |
-| GET | `/api/admin/tenants` | 租户列表（分页） | super_admin |
-| POST | `/api/admin/tenants` | 创建租户 | super_admin |
-| PUT | `/api/admin/tenants/{id}` | 更新租户 | super_admin |
-| DELETE | `/api/admin/tenants/{id}` | 删除租户（软） | super_admin |
-| GET | `/api/admin/dead-letters` | 死信列表（DB） | super_admin |
-| POST | `/api/admin/dead-letters/retry` | 重试单条死信 | super_admin |
-| POST | `/api/admin/dead-letters/retry-all` | 按类型批量重试 | super_admin |
-| DELETE | `/api/admin/dead-letters` | 删除死信 | super_admin |
+| GET | `/api/user/admin/table` | 用户列表（分页） | `user.read` |
+| GET | `/api/user/admin/{id}` | 查询用户 | `user.read` |
+| POST | `/api/user/admin` | 创建用户 | `user.create` |
+| PUT | `/api/user/admin/{id}` | 更新用户 | `user.update` |
+| PUT | `/api/user/admin/{id}/roles` | 分配当前租户角色 | `user.assign_roles` |
+| DELETE | `/api/user/admin/{id}` | 删除用户（软） | `user.delete` |
+| GET | `/api/permission/table` | 可分配权限列表 | `permission.read` |
+| GET | `/api/role/{id}` | 查询角色 | `role.read` |
+| GET | `/api/role/table` | 内置及当前租户角色列表 | `role.read` |
+| POST | `/api/role` | 创建租户自定义角色 | `role.create` |
+| PUT | `/api/role/{id}` | 更新自定义角色 | `role.update` |
+| PUT | `/api/role/{id}/permissions` | 配置自定义角色权限 | `role.assign_permissions` |
+| DELETE | `/api/role/{id}` | 删除自定义角色 | `role.delete` |
+| GET | `/api/admin/tenants/code` | 生成租户 Code | `tenant.create` |
+| GET | `/api/admin/tenants/{id}` | 查询租户 | `tenant.read` |
+| GET | `/api/admin/tenants` | 租户列表（分页） | `tenant.read` |
+| POST | `/api/admin/tenants` | 创建租户 | `tenant.create` |
+| PUT | `/api/admin/tenants/{id}` | 更新租户 | `tenant.update` |
+| DELETE | `/api/admin/tenants/{id}` | 删除租户（软） | `tenant.delete` |
+| GET | `/api/admin/dead-letters` | 死信列表（DB） | `dead_letter.read` |
+| POST | `/api/admin/dead-letters/retry` | 重试单条死信 | `dead_letter.retry` |
+| POST | `/api/admin/dead-letters/retry-all` | 按类型批量重试 | `dead_letter.retry` |
+| DELETE | `/api/admin/dead-letters` | 删除死信 | `dead_letter.delete` |
 
 ### Swagger UI
 
@@ -316,9 +323,10 @@ internal/database/migration/migrations/
   ├── 00001_create_user_roles.sql
   ├── 00002_create_tenants.sql
   ├── 00003_create_users.sql
-  └── 00004_create_user_role_refs.sql
-  └── 00005_create_dead_letters.sql
-  └── 00006_create_user_tenant_refs.sql
+  ├── 00004_create_user_tenant_refs.sql
+  ├── 00005_create_user_tenant_role_refs.sql
+  ├── 00006_create_permissions.sql
+  └── 00007_create_dead_letters.sql
 ```
 
 ### 添加新表
