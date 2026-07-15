@@ -2,10 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"time"
 
+	"go-server-starter/internal/constant"
 	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
 	"go-server-starter/internal/exception"
@@ -14,7 +16,9 @@ import (
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/utils"
 
+	goredis "github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
+	"golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 )
 
@@ -34,10 +38,11 @@ type UserRoleService interface {
 }
 
 type UserRoleServiceImpl struct {
-	repo   repo.Repo
-	redis  *redis.Client
-	access PermissionService
-	logger *zap.Logger
+	repo    repo.Repo
+	redis   *redis.Client
+	access  PermissionService
+	logger  *zap.Logger
+	sfGroup singleflight.Group
 }
 
 func NewUserRoleService(repo repo.Repo, redis *redis.Client, access PermissionService, logger *zap.Logger) UserRoleService {
@@ -86,7 +91,46 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode
 }
 
 func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception) {
-	return s.GetRolesCodeByUniCode(ctx, uniCode)
+	// A nil Redis client is useful in isolated unit tests and should not disable
+	// authorization. Production always injects the configured client.
+	if s.redis == nil {
+		return s.GetRolesCodeByUniCode(ctx, uniCode)
+	}
+
+	cacheKey := constant.RedisKeyOfAuthRoles(cctx.GetTenantID(ctx), uniCode)
+	if data, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
+		var roles []string
+		if err := json.Unmarshal([]byte(data), &roles); err == nil {
+			return roles, nil
+		}
+		// Treat malformed cache data as a miss. The DB result below overwrites it.
+		if s.logger != nil {
+			s.logger.Warn("invalid role cache, falling back to DB", zap.String("key", cacheKey))
+		}
+	} else if !errors.Is(err, goredis.Nil) && s.logger != nil {
+		s.logger.Warn("redis unavailable, falling back to DB", zap.Error(err))
+	}
+
+	result, err, _ := s.sfGroup.Do(cacheKey, func() (any, error) {
+		roles, exc := s.GetRolesCodeByUniCode(ctx, uniCode)
+		if exc != nil {
+			return nil, exc
+		}
+		data, marshalErr := json.Marshal(roles)
+		if marshalErr == nil {
+			if setErr := s.redis.Set(ctx, cacheKey, data, constant.REDIS_EXPIRE_OF_AUTH_ROLES).Err(); setErr != nil && s.logger != nil {
+				s.logger.Warn("failed to cache roles", zap.Error(setErr))
+			}
+		}
+		return roles, nil
+	})
+	if err != nil {
+		if exc, ok := err.(*exception.Exception); ok {
+			return nil, exc
+		}
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	return result.([]string), nil
 }
 
 func permissionRes(permission model.Permission) dto.PermissionResDto {
