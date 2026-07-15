@@ -326,7 +326,8 @@ internal/database/migration/migrations/
   ├── 00004_create_user_tenant_refs.sql
   ├── 00005_create_user_tenant_role_refs.sql
   ├── 00006_create_permissions.sql
-  └── 00007_create_dead_letters.sql
+  ├── 00007_create_role_permission_refs.sql
+  └── 00008_create_dead_letters.sql
 ```
 
 ### 添加新表
