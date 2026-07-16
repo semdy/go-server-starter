@@ -13,7 +13,10 @@ CREATE TABLE user_roles (
     enabled TINYINT(1) DEFAULT 1,
     UNIQUE INDEX idx_tenant_role_code (tenant_id, code),
     INDEX idx_user_roles_tenant_id (tenant_id),
-    INDEX idx_deleted_at (deleted_at)
+    INDEX idx_deleted_at (deleted_at),
+    CONSTRAINT chk_custom_role_code CHECK (
+        built_in = 1 OR code NOT IN ('super_admin', 'admin', 'guest', 'user', 'user_vip', 'user_svip')
+    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- +goose Down

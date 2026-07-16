@@ -85,20 +85,11 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	return effectiveRoleCodes(roles), nil
-}
-
-func effectiveRoleCodes(roles []*model.UserRole) []string {
-	codes := make([]string, 0, len(roles))
-	for _, role := range roles {
-		// A legacy custom role using a reserved built-in code must never satisfy
-		// role-based platform checks such as super_admin.
-		if !role.BuiltIn && enum.RoleCode(role.Code).IsValid() {
-			continue
-		}
-		codes = append(codes, role.Code)
+	codes := make([]string, len(roles))
+	for i, role := range roles {
+		codes[i] = role.Code
 	}
-	return codes
+	return codes, nil
 }
 
 func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception) {

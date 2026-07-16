@@ -69,14 +69,3 @@ func TestBuiltInRoleCodeCannotBeUsedByCustomRole(t *testing.T) {
 		t.Fatalf("expected built-in role code to be reserved, got %v", exc)
 	}
 }
-
-func TestCustomRoleUsingReservedCodeCannotSatisfyRoleCheck(t *testing.T) {
-	codes := effectiveRoleCodes([]*model.UserRole{
-		{TenantID: 42, Code: "super_admin", BuiltIn: false, Enabled: true},
-		{TenantID: 0, Code: "admin", BuiltIn: true, Enabled: true},
-		{TenantID: 42, Code: "editor", BuiltIn: false, Enabled: true},
-	})
-	if len(codes) != 2 || codes[0] != "admin" || codes[1] != "editor" {
-		t.Fatalf("unexpected effective role codes: %v", codes)
-	}
-}

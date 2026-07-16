@@ -154,20 +154,6 @@ func (s *seed) SeedPermissions() error {
 		}
 	}
 
-	// Remove legacy forbidden mappings if this rule is introduced into an
-	// existing development database. Built-in super_admin is handled below.
-	result := s.repo.DB().WithContext(ctx).Exec(`
-		DELETE rp FROM role_permission_refs AS rp
-		JOIN user_roles AS r ON r.id = rp.role_id
-		JOIN permissions AS p ON p.id = rp.permission_id
-		WHERE r.built_in = ? AND p.code IN ?`, false, constant.TenantManagementPermissions)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected > 0 {
-		s.logger.Warn("removed tenant management permissions from custom roles", zap.Int64("count", result.RowsAffected))
-	}
-
 	allPermissions, err := s.repo.Permission().GetMany(ctx, repo.Where("enabled = ?", true))
 	if err != nil {
 		return err

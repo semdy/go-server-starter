@@ -137,7 +137,11 @@ func (s *PermissionServiceImpl) repoRoles(ctx context.Context, uniCode string) (
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	return effectiveRoleCodes(roles), nil
+	codes := make([]string, len(roles))
+	for i, role := range roles {
+		codes[i] = role.Code
+	}
+	return codes, nil
 }
 
 func permissionToDto(permissionID uint64, code, name, description string, enabled bool) dto.PermissionResDto {
