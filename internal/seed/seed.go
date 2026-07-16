@@ -3,10 +3,13 @@ package seed
 import (
 	"context"
 	"errors"
+	"fmt"
+
 	"go-server-starter/internal/constant"
 	"go-server-starter/internal/enum"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
+	"go-server-starter/pkg/redis"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -18,11 +21,12 @@ type Seed interface {
 
 type seed struct {
 	repo   repo.Repo
+	redis  *redis.Client
 	logger *zap.Logger
 }
 
-func NewSeed(repo repo.Repo, logger *zap.Logger) Seed {
-	return &seed{repo: repo, logger: logger}
+func NewSeed(repo repo.Repo, redis *redis.Client, logger *zap.Logger) Seed {
+	return &seed{repo: repo, redis: redis, logger: logger}
 }
 
 func (s *seed) Run() error {
@@ -35,6 +39,33 @@ func (s *seed) Run() error {
 	if err := s.SeedPermissions(); err != nil {
 		return err
 	}
+	return s.clearAccessCaches()
+}
+
+func (s *seed) clearAccessCaches() error {
+	ctx := context.Background()
+	var deleted int64
+	for _, pattern := range []string{"auth:roles:*", "auth:permissions:*"} {
+		var cursor uint64
+		for {
+			keys, next, err := s.redis.Scan(ctx, cursor, pattern, 100).Result()
+			if err != nil {
+				return fmt.Errorf("scan access cache keys with pattern %q: %w", pattern, err)
+			}
+			if len(keys) > 0 {
+				count, err := s.redis.Del(ctx, keys...).Result()
+				if err != nil {
+					return fmt.Errorf("delete access cache keys with pattern %q: %w", pattern, err)
+				}
+				deleted += count
+			}
+			cursor = next
+			if cursor == 0 {
+				break
+			}
+		}
+	}
+	s.logger.Info("cleared access caches after seed", zap.Int64("count", deleted))
 	return nil
 }
 
@@ -121,6 +152,20 @@ func (s *seed) SeedPermissions() error {
 				return err
 			}
 		}
+	}
+
+	// Remove legacy forbidden mappings if this rule is introduced into an
+	// existing development database. Built-in super_admin is handled below.
+	result := s.repo.DB().WithContext(ctx).Exec(`
+		DELETE rp FROM role_permission_refs AS rp
+		JOIN user_roles AS r ON r.id = rp.role_id
+		JOIN permissions AS p ON p.id = rp.permission_id
+		WHERE r.built_in = ? AND p.code IN ?`, false, constant.TenantManagementPermissions)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected > 0 {
+		s.logger.Warn("removed tenant management permissions from custom roles", zap.Int64("count", result.RowsAffected))
 	}
 
 	allPermissions, err := s.repo.Permission().GetMany(ctx, repo.Where("enabled = ?", true))

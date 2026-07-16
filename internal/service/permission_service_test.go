@@ -47,9 +47,10 @@ func (r *permissionRoleRepoStub) GetPermissionCodesByUserAndTenant(_ context.Con
 }
 
 type permissionRepoHarness struct {
-	user   repo.UserRepo
-	role   repo.UserRoleRepo
-	tenant repo.TenantRepo
+	user       repo.UserRepo
+	role       repo.UserRoleRepo
+	tenant     repo.TenantRepo
+	permission repo.PermissionRepo
 }
 
 func (r *permissionRepoHarness) DB() *gorm.DB                                            { return nil }
@@ -57,7 +58,7 @@ func (r *permissionRepoHarness) Logger() *zap.Logger                            
 func (r *permissionRepoHarness) Transaction(context.Context, func(*gorm.DB) error) error { return nil }
 func (r *permissionRepoHarness) User() repo.UserRepo                                     { return r.user }
 func (r *permissionRepoHarness) UserRole() repo.UserRoleRepo                             { return r.role }
-func (r *permissionRepoHarness) Permission() repo.PermissionRepo                         { return nil }
+func (r *permissionRepoHarness) Permission() repo.PermissionRepo                         { return r.permission }
 func (r *permissionRepoHarness) DeadLetter() repo.DeadLetterRepo                         { return nil }
 func (r *permissionRepoHarness) Tenant() repo.TenantRepo                                 { return r.tenant }
 

@@ -200,7 +200,7 @@ Built-in roles:
 - `user_svip` - SVIP user
 - `guest` - Guest user
 
-The six built-in roles are immutable. Tenant administrators can create custom roles and assign any permissions they currently hold. User-role assignments are scoped by tenant, so the same user can have different roles in different tenants.
+The six built-in roles are immutable. Tenant administrators can create custom roles and assign permissions they currently hold, except platform-level `tenant.*` permissions. Tenant management APIs require the built-in `super_admin` role and cannot be opened to custom roles. User-role assignments are scoped by tenant, so the same user can have different roles in different tenants.
 
 Protect routes with permission checks:
 

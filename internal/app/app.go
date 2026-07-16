@@ -152,6 +152,7 @@ func (a *App) Start() error {
 	// 初始化seed
 	a.seed = seed.NewSeed(
 		a.repo,
+		a.redis,
 		a.logger.Named("SEED"),
 	)
 

@@ -46,7 +46,7 @@ func (r *UserRoleRepoImpl) GetRolesByUserAndTenant(ctx context.Context, userID, 
 		Table("user_roles AS r").
 		Select("r.*").
 		Joins("JOIN user_tenant_role_refs AS utr ON utr.role_id = r.id").
-		Where("utr.user_id = ? AND utr.tenant_id = ? AND r.enabled = ? AND r.deleted_at IS NULL", userID, tenantID, true).
+		Where("utr.user_id = ? AND utr.tenant_id = ? AND (r.tenant_id = 0 OR r.tenant_id = utr.tenant_id) AND r.enabled = ? AND r.deleted_at IS NULL", userID, tenantID, true).
 		Order("r.built_in DESC, r.code ASC").
 		Find(&roles).Error
 	return roles, err
@@ -60,7 +60,7 @@ func (r *UserRoleRepoImpl) GetPermissionCodesByUserAndTenant(ctx context.Context
 		Joins("JOIN role_permission_refs AS rp ON rp.permission_id = p.id").
 		Joins("JOIN user_roles AS r ON r.id = rp.role_id AND r.deleted_at IS NULL AND r.enabled = ?", true).
 		Joins("JOIN user_tenant_role_refs AS utr ON utr.role_id = r.id").
-		Where("utr.user_id = ? AND utr.tenant_id = ? AND p.enabled = ? AND p.deleted_at IS NULL", userID, tenantID, true).
+		Where("utr.user_id = ? AND utr.tenant_id = ? AND (r.tenant_id = 0 OR r.tenant_id = utr.tenant_id) AND p.enabled = ? AND p.deleted_at IS NULL", userID, tenantID, true).
 		Order("p.code ASC").
 		Pluck("p.code", &codes).Error
 	return codes, err

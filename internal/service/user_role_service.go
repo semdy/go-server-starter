@@ -10,6 +10,7 @@ import (
 	"go-server-starter/internal/constant"
 	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
+	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
@@ -84,11 +85,20 @@ func (s *UserRoleServiceImpl) GetRolesCodeByUniCode(ctx context.Context, uniCode
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	codes := make([]string, len(roles))
-	for i, role := range roles {
-		codes[i] = role.Code
+	return effectiveRoleCodes(roles), nil
+}
+
+func effectiveRoleCodes(roles []*model.UserRole) []string {
+	codes := make([]string, 0, len(roles))
+	for _, role := range roles {
+		// A legacy custom role using a reserved built-in code must never satisfy
+		// role-based platform checks such as super_admin.
+		if !role.BuiltIn && enum.RoleCode(role.Code).IsValid() {
+			continue
+		}
+		codes = append(codes, role.Code)
 	}
-	return codes, nil
+	return codes
 }
 
 func (s *UserRoleServiceImpl) GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception) {
@@ -209,6 +219,11 @@ func (s *UserRoleServiceImpl) validatePermissionIDs(ctx context.Context, ids []u
 	if len(permissions) != len(ids) {
 		return exception.InvalidParam.Append("one or more permissions do not exist or are disabled")
 	}
+	for _, permission := range permissions {
+		if constant.IsTenantManagementPermission(permission.Code) {
+			return exception.Forbidden.Append("tenant management permissions cannot be assigned to custom roles")
+		}
+	}
 	actor := cctx.GetUserUniCodeFromContext(ctx)
 	if actor == "" || s.access == nil {
 		return exception.Forbidden.Append("authorization identity not found")
@@ -232,6 +247,9 @@ func (s *UserRoleServiceImpl) validatePermissionIDs(ctx context.Context, ids []u
 func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception) {
 	if !roleCodePattern.MatchString(params.Code) {
 		return nil, exception.InvalidParam.Append("role code must match ^[a-z][a-z0-9_]{1,49}$")
+	}
+	if enum.RoleCode(params.Code).IsValid() {
+		return nil, exception.Forbidden.Append("built-in role codes are reserved")
 	}
 	tenantID := cctx.GetTenantID(ctx)
 	existing, err := s.repo.UserRole().GetOne(ctx, repo.Where("tenant_id = ? AND code = ?", tenantID, params.Code))
@@ -274,6 +292,9 @@ func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.
 	if params.Code != nil {
 		if !roleCodePattern.MatchString(*params.Code) {
 			return nil, exception.InvalidParam.Append("invalid role code")
+		}
+		if enum.RoleCode(*params.Code).IsValid() {
+			return nil, exception.Forbidden.Append("built-in role codes are reserved")
 		}
 		existing, err := s.repo.UserRole().GetOne(ctx,
 			repo.Where("tenant_id = ? AND code = ? AND id <> ?", cctx.GetTenantID(ctx), *params.Code, id))

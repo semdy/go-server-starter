@@ -5,11 +5,13 @@ import (
 	"errors"
 	cctx "go-server-starter/internal/ctx"
 	"go-server-starter/internal/dto"
+	"go-server-starter/internal/enum"
 	"go-server-starter/internal/exception"
 	"go-server-starter/internal/model"
 	"go-server-starter/internal/repo"
 	"go-server-starter/pkg/redis"
 	"go-server-starter/pkg/utils"
+	"slices"
 	"time"
 
 	"go.uber.org/zap"
@@ -334,8 +336,7 @@ func (s *UserServiceImpl) SetRoles(ctx context.Context, id uint64, params dto.Us
 		return nil, exception.UserNotFound
 	}
 
-	roles, err := s.repo.UserRole().GetByIDs(ctx, params.RoleIDs,
-		repo.Where("enabled = ? AND (tenant_id = 0 OR tenant_id = ?)", true, tenantID))
+	roles, err := s.repo.UserRole().GetByIDs(ctx, params.RoleIDs, repo.Where("enabled = ? AND (tenant_id = 0 OR tenant_id = ?)", true, tenantID))
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
@@ -347,15 +348,12 @@ func (s *UserServiceImpl) SetRoles(ctx context.Context, id uint64, params dto.Us
 	if exc != nil {
 		return nil, exc
 	}
-	isSuperAdmin := false
-	for _, code := range actorRoles {
-		if code == "super_admin" {
-			isSuperAdmin = true
-			break
-		}
-	}
+	isSuperAdmin := slices.Contains(actorRoles, enum.RoleCodeSuperAdmin.String())
 	for _, role := range roles {
-		if role.Code == "super_admin" && !isSuperAdmin {
+		if !role.BuiltIn && enum.RoleCode(role.Code).IsValid() {
+			return nil, exception.Forbidden.Append("custom roles cannot use built-in role codes")
+		}
+		if role.Code == enum.RoleCodeSuperAdmin.String() && !isSuperAdmin {
 			return nil, exception.Forbidden.Append("only super_admin can assign super_admin")
 		}
 	}

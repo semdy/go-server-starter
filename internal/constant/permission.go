@@ -61,3 +61,22 @@ var AdminPermissions = []string{
 	PermissionRoleAssignPermissions,
 	PermissionPermissionRead,
 }
+
+// TenantManagementPermissions are platform-level capabilities. They belong
+// exclusively to the built-in super_admin role and cannot be granted to
+// tenant custom roles.
+var TenantManagementPermissions = []string{
+	PermissionTenantRead,
+	PermissionTenantCreate,
+	PermissionTenantUpdate,
+	PermissionTenantDelete,
+}
+
+func IsTenantManagementPermission(code string) bool {
+	for _, permission := range TenantManagementPermissions {
+		if code == permission {
+			return true
+		}
+	}
+	return false
+}

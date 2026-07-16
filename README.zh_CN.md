@@ -200,7 +200,7 @@ if (newToken) localStorage.setItem('token', newToken)
 - `user_svip` - SVIP 用户
 - `guest` - 访客
 
-六个内置角色不可修改、不可删除，也不能通过 API 修改其权限。租户管理员可以创建当前租户的自定义角色，并为其配置自己拥有的权限。用户角色关系包含 `tenant_id`，因此同一用户可以在不同租户拥有不同角色。
+六个内置角色不可修改、不可删除，也不能通过 API 修改其权限。租户管理员可以创建当前租户的自定义角色，并为其配置自己拥有的权限，但不能授予平台级 `tenant.*` 权限。租户管理接口只允许内置 `super_admin` 角色访问，不能通过自定义角色开放。用户角色关系包含 `tenant_id`，因此同一用户可以在不同租户拥有不同角色。
 
 使用权限检查保护路由：
 
@@ -240,12 +240,12 @@ router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelet
 | PUT | `/api/role/{id}` | 更新自定义角色 | `role.update` |
 | PUT | `/api/role/{id}/permissions` | 配置自定义角色权限 | `role.assign_permissions` |
 | DELETE | `/api/role/{id}` | 删除自定义角色 | `role.delete` |
-| GET | `/api/admin/tenants/code` | 生成租户 Code | `tenant.create` |
-| GET | `/api/admin/tenants/{id}` | 查询租户 | `tenant.read` |
-| GET | `/api/admin/tenants` | 租户列表（分页） | `tenant.read` |
-| POST | `/api/admin/tenants` | 创建租户 | `tenant.create` |
-| PUT | `/api/admin/tenants/{id}` | 更新租户 | `tenant.update` |
-| DELETE | `/api/admin/tenants/{id}` | 删除租户（软） | `tenant.delete` |
+| GET | `/api/admin/tenants/code` | 生成租户 Code | `super_admin` |
+| GET | `/api/admin/tenants/{id}` | 查询租户 | `super_admin` |
+| GET | `/api/admin/tenants` | 租户列表（分页） | `super_admin` |
+| POST | `/api/admin/tenants` | 创建租户 | `super_admin` |
+| PUT | `/api/admin/tenants/{id}` | 更新租户 | `super_admin` |
+| DELETE | `/api/admin/tenants/{id}` | 删除租户（软） | `super_admin` |
 | GET | `/api/admin/dead-letters` | 死信列表（DB） | `dead_letter.read` |
 | POST | `/api/admin/dead-letters/retry` | 重试单条死信 | `dead_letter.retry` |
 | POST | `/api/admin/dead-letters/retry-all` | 按类型批量重试 | `dead_letter.retry` |

@@ -137,11 +137,7 @@ func (s *PermissionServiceImpl) repoRoles(ctx context.Context, uniCode string) (
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	codes := make([]string, len(roles))
-	for i, role := range roles {
-		codes[i] = role.Code
-	}
-	return codes, nil
+	return effectiveRoleCodes(roles), nil
 }
 
 func permissionToDto(permissionID uint64, code, name, description string, enabled bool) dto.PermissionResDto {
@@ -159,6 +155,7 @@ func (s *PermissionServiceImpl) GetTable(ctx context.Context, params dto.Permiss
 	}
 	permissions, total, err := s.repo.Permission().GetTable(ctx, params.Page, params.PageSize,
 		repo.Where("code IN ?", allowedCodes), repo.Order("code ASC"),
+		repo.Where("code NOT IN ?", constant.TenantManagementPermissions),
 		repo.WhereAutoLike("code", params.Code), repo.WherePtrNonEmpty("enabled = ?", params.Enabled))
 	if err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
