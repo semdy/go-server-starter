@@ -573,6 +573,28 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/my-tenants": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回当前租户 ID，以及当前用户已加入且启用的全部租户。",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "当前用户可用租户",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.MyTenantsResDto"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/send-email-code": {
             "post": {
                 "description": "向指定邮箱发送登录验证码。60 秒内不可重复请求。",
@@ -1579,9 +1601,26 @@ const docTemplate = `{
                 }
             }
         },
+        "go-server-starter_internal_dto.AuthTenantResDto": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "go-server-starter_internal_dto.AuthTokenResDto": {
             "type": "object",
             "properties": {
+                "currentTenantId": {
+                    "type": "integer"
+                },
                 "permissions": {
                     "type": "array",
                     "items": {
@@ -1592,6 +1631,12 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                },
+                "tenants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.AuthTenantResDto"
                     }
                 },
                 "token": {
@@ -1661,6 +1706,20 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                }
+            }
+        },
+        "go-server-starter_internal_dto.MyTenantsResDto": {
+            "type": "object",
+            "properties": {
+                "currentTenantId": {
+                    "type": "integer"
+                },
+                "tenants": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.AuthTenantResDto"
                     }
                 }
             }

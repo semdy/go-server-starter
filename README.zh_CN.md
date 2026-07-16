@@ -209,9 +209,11 @@ router.GET("/users", auth.PermissionCheckAny(constant.PermissionUserRead), handl
 router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelete), handler)
 ```
 
-登录和切换租户接口会同时返回当前租户下的 `roles` 和 `permissions`。前端也可以单独刷新访问能力：
+登录和切换租户接口会同时返回 `currentTenantId`、当前用户已加入且启用的 `tenants`，以及当前租户下的 `roles` 和 `permissions`。前端也可以分别刷新访问能力和租户列表：
 
 `GET /api/auth/my-access`
+
+`GET /api/auth/my-tenants`
 
 ## 🌐 API 接口
 
@@ -224,6 +226,7 @@ router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelet
 | POST | `/api/auth/login/mobile` | 手机号 + 验证码登录 | 否 |
 | POST | `/api/auth/login/email` | 邮箱 + 验证码登录 | 否 |
 | POST | `/api/auth/switch-tenant` | 切换到其他租户 | 是 |
+| GET | `/api/auth/my-tenants` | 获取当前用户已加入且启用的租户 | 是 |
 | GET | `/api/auth/my-access` | 获取当前租户的角色和权限代码 | 是 |
 | GET | `/api/user/my-info` | 获取当前用户信息 | 是 |
 | PUT | `/api/user/my-info` | 更新当前用户信息 | 是 |

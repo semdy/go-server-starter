@@ -19,6 +19,7 @@ type UserRepo interface {
 	GetByUniCode(ctx context.Context, uniCode string) (*model.User, error)
 	AddTenantMembership(ctx context.Context, userID uint64, tenantID uint64) error
 	HasTenantMembership(ctx context.Context, userID uint64, tenantID uint64) (bool, error)
+	GetTenantsByUserID(ctx context.Context, userID uint64) ([]*model.Tenant, error)
 }
 
 type UserRepoImpl struct {
@@ -85,4 +86,16 @@ func (r *UserRepoImpl) HasTenantMembership(ctx context.Context, userID uint64, t
 		Where("user_id = ? AND tenant_id = ?", userID, tenantID).
 		Count(&count).Error
 	return count > 0, err
+}
+
+func (r *UserRepoImpl) GetTenantsByUserID(ctx context.Context, userID uint64) ([]*model.Tenant, error) {
+	tenants := make([]*model.Tenant, 0)
+	err := r.db.WithContext(ctx).
+		Table("tenants AS t").
+		Select("t.*").
+		Joins("JOIN user_tenant_refs AS utr ON utr.tenant_id = t.id").
+		Where("utr.user_id = ? AND t.active = ? AND t.deleted_at IS NULL", userID, true).
+		Order("t.name ASC, t.id ASC").
+		Find(&tenants).Error
+	return tenants, err
 }

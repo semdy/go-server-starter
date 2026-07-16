@@ -23,8 +23,19 @@ definitions:
     - countryCode
     - mobile
     type: object
+  go-server-starter_internal_dto.AuthTenantResDto:
+    properties:
+      code:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
   go-server-starter_internal_dto.AuthTokenResDto:
     properties:
+      currentTenantId:
+        type: integer
       permissions:
         items:
           type: string
@@ -32,6 +43,10 @@ definitions:
       roles:
         items:
           type: string
+        type: array
+      tenants:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.AuthTenantResDto'
         type: array
       token:
         type: string
@@ -78,6 +93,15 @@ definitions:
       roles:
         items:
           type: string
+        type: array
+    type: object
+  go-server-starter_internal_dto.MyTenantsResDto:
+    properties:
+      currentTenantId:
+        type: integer
+      tenants:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.AuthTenantResDto'
         type: array
     type: object
   go-server-starter_internal_dto.PaginationResDto-array_go-server-starter_internal_dto_DeadLetterItem:
@@ -791,6 +815,19 @@ paths:
       security:
       - BearerAuth: []
       summary: 当前用户访问能力
+      tags:
+      - auth
+  /auth/my-tenants:
+    get:
+      description: 返回当前租户 ID，以及当前用户已加入且启用的全部租户。
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.MyTenantsResDto'
+      security:
+      - BearerAuth: []
+      summary: 当前用户可用租户
       tags:
       - auth
   /auth/send-email-code:

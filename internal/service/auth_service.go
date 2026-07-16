@@ -22,6 +22,7 @@ type AuthService interface {
 	LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 	LoginByEmailAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByEmailAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception)
 	SwitchTenant(ctx context.Context, uniCode string, deviceType enum.DeviceType, params dto.SwitchTenantReqDto) (*dto.AuthTokenResDto, *exception.Exception)
+	GetMyTenants(ctx context.Context, uniCode string) (*dto.MyTenantsResDto, *exception.Exception)
 }
 
 type AuthServiceImpl struct {
@@ -34,6 +35,42 @@ type AuthServiceImpl struct {
 
 func NewAuthService(repo repo.Repo, jwt *jwt.JWT, access PermissionService, taskq *taskq.Client, logger *zap.Logger) AuthService {
 	return &AuthServiceImpl{repo: repo, jwt: jwt, access: access, taskq: taskq, logger: logger}
+}
+
+func tenantAuthDtos(tenants []*model.Tenant) []dto.AuthTenantResDto {
+	result := make([]dto.AuthTenantResDto, len(tenants))
+	for i, tenant := range tenants {
+		result[i] = dto.AuthTenantResDto{ID: tenant.ID, Code: tenant.Code, Name: tenant.Name}
+	}
+	return result
+}
+
+func (s *AuthServiceImpl) getAvailableTenants(ctx context.Context, userID uint64) ([]dto.AuthTenantResDto, *exception.Exception) {
+	tenants, err := s.repo.User().GetTenantsByUserID(ctx, userID)
+	if err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	return tenantAuthDtos(tenants), nil
+}
+
+func (s *AuthServiceImpl) buildTokenResponse(ctx context.Context, user *model.User, currentTenantID uint64, token string) (*dto.AuthTokenResDto, *exception.Exception) {
+	tenants, exc := s.getAvailableTenants(ctx, user.ID)
+	if exc != nil {
+		return nil, exc
+	}
+	res := &dto.AuthTokenResDto{
+		Token: token, CurrentTenantID: currentTenantID, Tenants: tenants,
+		Roles: []string{}, Permissions: []string{},
+	}
+	if s.access != nil {
+		access, exc := s.access.GetMyAccess(cctx.WithTenant(ctx, currentTenantID), user.UniCode)
+		if exc != nil {
+			return nil, exc
+		}
+		res.Roles = access.Roles
+		res.Permissions = access.Permissions
+	}
+	return res, nil
 }
 
 // loginOrRegister looks up a user, returns their tenant_id from DB, or auto-generates one for new users.
@@ -136,16 +173,7 @@ func (s *AuthServiceImpl) loginOrRegister(
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
 
-	res := &dto.AuthTokenResDto{Token: token, Roles: []string{}, Permissions: []string{}}
-	if s.access != nil {
-		access, exc := s.access.GetMyAccess(cctx.WithTenant(ctx, user.TenantID), user.UniCode)
-		if exc != nil {
-			return nil, exc
-		}
-		res.Roles = access.Roles
-		res.Permissions = access.Permissions
-	}
-	return res, nil
+	return s.buildTokenResponse(ctx, user, user.TenantID, token)
 }
 
 func (s *AuthServiceImpl) LoginByMobileAndCode(ctx context.Context, deviceType enum.DeviceType, params dto.AuthLoginByMobileAndCodeReqDto) (*dto.AuthTokenResDto, *exception.Exception) {
@@ -209,14 +237,23 @@ func (s *AuthServiceImpl) SwitchTenant(ctx context.Context, uniCode string, devi
 	if tokenErr != nil {
 		return nil, exception.InternalServerError.Append(tokenErr.Error())
 	}
-	res := &dto.AuthTokenResDto{Token: token, Roles: []string{}, Permissions: []string{}}
-	if s.access != nil {
-		access, exc := s.access.GetMyAccess(cctx.WithTenant(ctx, tenant.ID), user.UniCode)
-		if exc != nil {
-			return nil, exc
+	return s.buildTokenResponse(ctx, user, tenant.ID, token)
+}
+
+func (s *AuthServiceImpl) GetMyTenants(ctx context.Context, uniCode string) (*dto.MyTenantsResDto, *exception.Exception) {
+	user, err := s.repo.User().GetByUniCode(ctx, uniCode)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, exception.UserNotFound
 		}
-		res.Roles = access.Roles
-		res.Permissions = access.Permissions
+		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	return res, nil
+	if !user.Active {
+		return nil, exception.Forbidden.Append("user is disabled")
+	}
+	tenants, exc := s.getAvailableTenants(ctx, user.ID)
+	if exc != nil {
+		return nil, exc
+	}
+	return &dto.MyTenantsResDto{CurrentTenantID: cctx.GetTenantID(ctx), Tenants: tenants}, nil
 }

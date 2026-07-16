@@ -209,9 +209,11 @@ router.GET("/users", auth.PermissionCheckAny(constant.PermissionUserRead), handl
 router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelete), handler)
 ```
 
-Login and tenant-switch responses include `roles` and `permissions`. Clients can refresh them independently:
+Login and tenant-switch responses include `currentTenantId`, active `tenants`, `roles`, and `permissions`. Clients can refresh access and tenant membership independently:
 
 `GET /api/auth/my-access`
+
+`GET /api/auth/my-tenants`
 
 ## 🌐 API Endpoints
 
@@ -224,6 +226,7 @@ Login and tenant-switch responses include `roles` and `permissions`. Clients can
 | POST | `/api/auth/login/mobile` | Login via mobile + code | No |
 | POST | `/api/auth/login/email` | Login via email + code | No |
 | POST | `/api/auth/switch-tenant` | Switch to another tenant | Yes |
+| GET | `/api/auth/my-tenants` | List current user's active tenants | Yes |
 | GET | `/api/user/my-info` | Get current user info | Yes |
 | PUT | `/api/user/my-info` | Update current user info | Yes |
 | GET | `/api/user/admin/table` | List users (paginated) | admin+ |

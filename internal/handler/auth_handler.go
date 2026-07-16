@@ -17,6 +17,7 @@ type AuthHandler interface {
 	SendEmailCode(c *gin.Context)
 	SwitchTenant(c *gin.Context)
 	MyAccess(c *gin.Context)
+	MyTenants(c *gin.Context)
 }
 
 type AuthHandlerImpl struct {
@@ -185,6 +186,28 @@ func (h *AuthHandlerImpl) MyAccess(c *gin.Context) {
 		return
 	}
 	res, exc := h.service.Permission().GetMyAccess(appCtx.Ctx, uniCode)
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	appCtx.ToSuccess(res)
+}
+
+// MyTenants godoc
+// @Summary 当前用户可用租户
+// @Description 返回当前租户 ID，以及当前用户已加入且启用的全部租户。
+// @Tags auth
+// @Security BearerAuth
+// @Success 200 {object} dto.MyTenantsResDto
+// @Router /auth/my-tenants [get]
+func (h *AuthHandlerImpl) MyTenants(c *gin.Context) {
+	appCtx := ctx.FromGinCtx(c)
+	uniCode, exc := appCtx.GetUserUniCode()
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	res, exc := h.service.Auth().GetMyTenants(appCtx.Ctx, uniCode)
 	if exc != nil {
 		appCtx.ToError(exc)
 		return
