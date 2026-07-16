@@ -16,6 +16,7 @@ type UserRoleRepo interface {
 	ReplaceUserRoles(ctx context.Context, userID, tenantID uint64, roleIDs []uint64) error
 	AddUserRole(ctx context.Context, userID, tenantID, roleID uint64) error
 	ReplaceRolePermissions(ctx context.Context, roleID uint64, permissionIDs []uint64) error
+	SetRolePermission(ctx context.Context, roleID, permissionID uint64, checked bool) error
 }
 
 type UserRoleRepoImpl struct {
@@ -98,4 +99,15 @@ func (r *UserRoleRepoImpl) ReplaceRolePermissions(ctx context.Context, roleID ui
 		}
 		return nil
 	})
+}
+
+func (r *UserRoleRepoImpl) SetRolePermission(ctx context.Context, roleID, permissionID uint64, checked bool) error {
+	if checked {
+		return r.db.WithContext(ctx).
+			Exec("INSERT IGNORE INTO role_permission_refs (role_id, permission_id) VALUES (?, ?)", roleID, permissionID).
+			Error
+	}
+	return r.db.WithContext(ctx).
+		Exec("DELETE FROM role_permission_refs WHERE role_id = ? AND permission_id = ?", roleID, permissionID).
+		Error
 }

@@ -200,7 +200,7 @@ if (newToken) localStorage.setItem('token', newToken)
 - `user_svip` - SVIP 用户
 - `guest` - 访客
 
-六个内置角色不可修改、不可删除，也不能通过 API 修改其权限。租户管理员可以创建当前租户的自定义角色，并为其配置自己拥有的权限，但不能授予平台级 `tenant.*` 权限。租户管理接口只允许内置 `super_admin` 角色访问，不能通过自定义角色开放。用户角色关系包含 `tenant_id`，因此同一用户可以在不同租户拥有不同角色。
+六个内置角色的基本信息不可修改、角色不可删除。`super_admin` 的权限也完全不可修改；其他五个内置角色仅允许 `super_admin` 通过角色权限接口配置。租户管理员可以创建当前租户的自定义角色，并为其配置自己拥有的权限，但 `tenant.*` 权限始终只属于 `super_admin`。租户管理接口只允许内置 `super_admin` 角色访问。用户角色关系包含 `tenant_id`，因此同一用户可以在不同租户拥有不同角色。
 
 使用权限检查保护路由：
 
@@ -236,9 +236,11 @@ router.DELETE("/users/:id", auth.PermissionCheckAny(constant.PermissionUserDelet
 | GET | `/api/permission/table` | 可分配权限列表 | `permission.read` |
 | GET | `/api/role/{id}` | 查询角色 | `role.read` |
 | GET | `/api/role/table` | 内置及当前租户角色列表 | `role.read` |
+| GET | `/api/role/{id}/permissions` | 查询全局权限及角色开关状态 | `role.read` |
 | POST | `/api/role` | 创建租户自定义角色 | `role.create` |
 | PUT | `/api/role/{id}` | 更新自定义角色 | `role.update` |
 | PUT | `/api/role/{id}/permissions` | 配置自定义角色权限 | `role.assign_permissions` |
+| PATCH | `/api/role/{id}/permissions/{permissionId}` | 切换单个角色权限开关 | `role.assign_permissions` |
 | DELETE | `/api/role/{id}` | 删除自定义角色 | `role.delete` |
 | GET | `/api/admin/tenants/code` | 生成租户 Code | `super_admin` |
 | GET | `/api/admin/tenants/{id}` | 查询租户 | `super_admin` |

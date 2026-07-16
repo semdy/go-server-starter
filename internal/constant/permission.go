@@ -48,7 +48,9 @@ var BuiltInPermissions = []struct {
 	{PermissionDeadLetterDelete, "删除死信"},
 }
 
-var AdminPermissions = []string{
+// DefaultAdminPermissions are assigned only when the built-in admin role is
+// first created. Later changes are preserved across application restarts.
+var DefaultAdminPermissions = []string{
 	PermissionUserRead,
 	PermissionUserCreate,
 	PermissionUserUpdate,
@@ -62,9 +64,8 @@ var AdminPermissions = []string{
 	PermissionPermissionRead,
 }
 
-// TenantManagementPermissions are platform-level capabilities. They belong
-// exclusively to the built-in super_admin role and cannot be granted to
-// tenant custom roles.
+// TenantManagementPermissions are platform-level capabilities that belong
+// exclusively to the built-in super_admin role.
 var TenantManagementPermissions = []string{
 	PermissionTenantRead,
 	PermissionTenantCreate,

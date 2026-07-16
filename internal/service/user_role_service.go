@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"slices"
 	"time"
 
 	"go-server-starter/internal/constant"
@@ -30,9 +31,11 @@ type UserRoleService interface {
 	GetCachedRolesCodeByUniCode(ctx context.Context, uniCode string) ([]string, *exception.Exception)
 	GetByID(ctx context.Context, id uint64) (*dto.UserRoleResDto, *exception.Exception)
 	GetTable(ctx context.Context, params dto.UserRoleTableQueryReqDto) (*dto.PaginationResDto[[]*dto.UserRoleResDto], *exception.Exception)
+	GetPermissionConfig(ctx context.Context, id uint64) (*dto.UserRolePermissionConfigResDto, *exception.Exception)
 	Create(ctx context.Context, params dto.UserRoleCreateReqDto) (*dto.UserRoleResDto, *exception.Exception)
 	Update(ctx context.Context, id uint64, params dto.UserRoleUpdateReqDto) (*dto.UserRoleResDto, *exception.Exception)
-	SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRoleResDto, *exception.Exception)
+	SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRolePermissionConfigResDto, *exception.Exception)
+	TogglePermission(ctx context.Context, id, permissionID uint64, checked bool) (*dto.UserRolePermissionConfigResDto, *exception.Exception)
 	Delete(ctx context.Context, id uint64) *exception.Exception
 	InvalidateTenantAccessCaches(ctx context.Context, tenantID uint64)
 	DeleteAccessCache(ctx context.Context, uniCode string)
@@ -199,20 +202,114 @@ func (s *UserRoleServiceImpl) GetTable(ctx context.Context, params dto.UserRoleT
 	return utils.AssemblePaginationResDto(res, total, params.Page, params.PageSize), nil
 }
 
-func (s *UserRoleServiceImpl) validatePermissionIDs(ctx context.Context, ids []uint64) *exception.Exception {
+func permissionIDSet(permissions []model.Permission) map[uint64]struct{} {
+	ids := make(map[uint64]struct{}, len(permissions))
+	for _, permission := range permissions {
+		ids[permission.ID] = struct{}{}
+	}
+	return ids
+}
+
+func stringSet(values []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		set[value] = struct{}{}
+	}
+	return set
+}
+
+func isSuperAdminRole(role *model.UserRole) bool {
+	return role.BuiltIn && role.TenantID == 0 && role.Code == enum.RoleCodeSuperAdmin.String()
+}
+
+func (s *UserRoleServiceImpl) canEditRolePermissions(ctx context.Context, role *model.UserRole, actorCanAssign bool) (bool, *exception.Exception) {
+	if isSuperAdminRole(role) || !actorCanAssign {
+		return false, nil
+	}
+	if !role.BuiltIn && role.TenantID != 0 {
+		return true, nil
+	}
+	actor := cctx.GetUserUniCodeFromContext(ctx)
+	if actor == "" {
+		return false, exception.Forbidden.Append("authorization identity not found")
+	}
+	actorRoles, exc := s.GetCachedRolesCodeByUniCode(ctx, actor)
+	if exc != nil {
+		return false, exc
+	}
+	return slices.Contains(actorRoles, enum.RoleCodeSuperAdmin.String()), nil
+}
+
+func (s *UserRoleServiceImpl) invalidateRolePermissionCaches(ctx context.Context, role *model.UserRole) {
+	if s.access == nil {
+		return
+	}
+	if role.BuiltIn || role.TenantID == 0 {
+		s.access.InvalidateGlobalAccessCaches(ctx)
+		return
+	}
+	s.access.InvalidateTenantAccessCaches(ctx, role.TenantID)
+}
+
+func (s *UserRoleServiceImpl) GetPermissionConfig(ctx context.Context, id uint64) (*dto.UserRolePermissionConfigResDto, *exception.Exception) {
+	role, exc := s.scopedRole(ctx, id, true)
+	if exc != nil {
+		return nil, exc
+	}
+	permissions, err := s.repo.Permission().GetMany(ctx, repo.Order("code ASC"))
+	if err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	actor := cctx.GetUserUniCodeFromContext(ctx)
+	if actor == "" || s.access == nil {
+		return nil, exception.Forbidden.Append("authorization identity not found")
+	}
+	actorPermissions, exc := s.access.GetCachedPermissionCodesByUniCode(ctx, actor)
+	if exc != nil {
+		return nil, exc
+	}
+	actorPermissionSet := stringSet(actorPermissions)
+	assignedPermissionSet := permissionIDSet(role.Permissions)
+	_, actorCanAssign := actorPermissionSet[constant.PermissionRoleAssignPermissions]
+	roleEditable, exc := s.canEditRolePermissions(ctx, role, actorCanAssign)
+	if exc != nil {
+		return nil, exc
+	}
+
+	items := make([]dto.UserRolePermissionItemResDto, len(permissions))
+	for i, permission := range permissions {
+		_, checked := assignedPermissionSet[permission.ID]
+		_, actorOwns := actorPermissionSet[permission.Code]
+		itemEditable := roleEditable && (checked || (permission.Enabled && actorOwns && !constant.IsTenantManagementPermission(permission.Code)))
+		items[i] = dto.UserRolePermissionItemResDto{
+			ID: permission.ID, Code: permission.Code, Name: permission.Name,
+			Description: permission.Description, Enabled: permission.Enabled,
+			Checked: checked, Editable: itemEditable,
+		}
+	}
+	return &dto.UserRolePermissionConfigResDto{
+		RoleID: role.ID, RoleCode: role.Code, RoleName: role.Name,
+		BuiltIn: role.BuiltIn, Editable: roleEditable, Permissions: items,
+	}, nil
+}
+
+func (s *UserRoleServiceImpl) validatePermissionIDs(ctx context.Context, ids []uint64, existingIDs map[uint64]struct{}) *exception.Exception {
 	if len(ids) == 0 {
 		return nil
 	}
-	permissions, err := s.repo.Permission().GetByIDs(ctx, ids, repo.Where("enabled = ?", true))
+	permissions, err := s.repo.Permission().GetByIDs(ctx, ids)
 	if err != nil {
 		return exception.InternalServerError.Append(err.Error())
 	}
 	if len(permissions) != len(ids) {
-		return exception.InvalidParam.Append("one or more permissions do not exist or are disabled")
+		return exception.InvalidParam.Append("one or more permissions do not exist")
 	}
 	for _, permission := range permissions {
 		if constant.IsTenantManagementPermission(permission.Code) {
-			return exception.Forbidden.Append("tenant management permissions cannot be assigned to custom roles")
+			return exception.Forbidden.Append("tenant management permissions can only belong to super_admin")
+		}
+		if _, exists := existingIDs[permission.ID]; !permission.Enabled && !exists {
+			return exception.InvalidParam.Append("disabled permissions cannot be assigned")
 		}
 	}
 	actor := cctx.GetUserUniCodeFromContext(ctx)
@@ -228,6 +325,9 @@ func (s *UserRoleServiceImpl) validatePermissionIDs(ctx context.Context, ids []u
 		allowed[code] = struct{}{}
 	}
 	for _, permission := range permissions {
+		if _, exists := existingIDs[permission.ID]; exists {
+			continue
+		}
 		if _, ok := allowed[permission.Code]; !ok {
 			return exception.Forbidden.Append("cannot grant permission not held by current user: " + permission.Code)
 		}
@@ -250,7 +350,7 @@ func (s *UserRoleServiceImpl) Create(ctx context.Context, params dto.UserRoleCre
 	if existing != nil {
 		return nil, exception.UserRoleAlreadyExists
 	}
-	if exc := s.validatePermissionIDs(ctx, params.PermissionIDs); exc != nil {
+	if exc := s.validatePermissionIDs(ctx, params.PermissionIDs, nil); exc != nil {
 		return nil, exc
 	}
 	enabled := true
@@ -319,22 +419,71 @@ func (s *UserRoleServiceImpl) Update(ctx context.Context, id uint64, params dto.
 	return s.GetByID(ctx, id)
 }
 
-func (s *UserRoleServiceImpl) SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRoleResDto, *exception.Exception) {
-	role, exc := s.scopedRole(ctx, id, false)
+func (s *UserRoleServiceImpl) SetPermissions(ctx context.Context, id uint64, params dto.UserRoleSetPermissionsReqDto) (*dto.UserRolePermissionConfigResDto, *exception.Exception) {
+	role, exc := s.scopedRole(ctx, id, true)
 	if exc != nil {
 		return nil, exc
 	}
-	if role.BuiltIn || role.TenantID == 0 {
-		return nil, exception.Forbidden.Append("built-in role permissions cannot be modified")
+	if isSuperAdminRole(role) {
+		return nil, exception.Forbidden.Append("super_admin permissions cannot be modified")
 	}
-	if exc := s.validatePermissionIDs(ctx, params.PermissionIDs); exc != nil {
+	if role.BuiltIn || role.TenantID == 0 {
+		editable, exc := s.canEditRolePermissions(ctx, role, true)
+		if exc != nil {
+			return nil, exc
+		}
+		if !editable {
+			return nil, exception.Forbidden.Append("only super_admin can modify built-in role permissions")
+		}
+	}
+	if exc := s.validatePermissionIDs(ctx, params.PermissionIDs, permissionIDSet(role.Permissions)); exc != nil {
 		return nil, exc
 	}
 	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, role.ID, params.PermissionIDs); err != nil {
 		return nil, exception.InternalServerError.Append(err.Error())
 	}
-	s.InvalidateTenantAccessCaches(ctx, cctx.GetTenantID(ctx))
-	return s.GetByID(ctx, id)
+	s.invalidateRolePermissionCaches(ctx, role)
+	return s.GetPermissionConfig(ctx, id)
+}
+
+func (s *UserRoleServiceImpl) TogglePermission(ctx context.Context, id, permissionID uint64, checked bool) (*dto.UserRolePermissionConfigResDto, *exception.Exception) {
+	role, exc := s.scopedRole(ctx, id, false)
+	if exc != nil {
+		return nil, exc
+	}
+	if isSuperAdminRole(role) {
+		return nil, exception.Forbidden.Append("super_admin permissions cannot be modified")
+	}
+	if role.BuiltIn || role.TenantID == 0 {
+		editable, exc := s.canEditRolePermissions(ctx, role, true)
+		if exc != nil {
+			return nil, exc
+		}
+		if !editable {
+			return nil, exception.Forbidden.Append("only super_admin can modify built-in role permissions")
+		}
+	}
+	if checked {
+		if exc := s.validatePermissionIDs(ctx, []uint64{permissionID}, nil); exc != nil {
+			return nil, exc
+		}
+	} else {
+		permission, err := s.repo.Permission().GetByID(ctx, permissionID)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, exception.InvalidParam.Append("permission not found")
+			}
+			return nil, exception.InternalServerError.Append(err.Error())
+		}
+		if permission == nil {
+			return nil, exception.InvalidParam.Append("permission not found")
+		}
+	}
+	if err := s.repo.UserRole().SetRolePermission(ctx, role.ID, permissionID, checked); err != nil {
+		return nil, exception.InternalServerError.Append(err.Error())
+	}
+	s.invalidateRolePermissionCaches(ctx, role)
+	return s.GetPermissionConfig(ctx, id)
 }
 
 func (s *UserRoleServiceImpl) Delete(ctx context.Context, id uint64) *exception.Exception {

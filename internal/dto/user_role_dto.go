@@ -21,6 +21,29 @@ type UserRoleSetPermissionsReqDto struct {
 	PermissionIDs []uint64 `json:"permissionIds"`
 }
 
+type UserRoleTogglePermissionReqDto struct {
+	Checked *bool `json:"checked" binding:"required"`
+}
+
+type UserRolePermissionItemResDto struct {
+	ID          uint64 `json:"id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Enabled     bool   `json:"enabled"`
+	Checked     bool   `json:"checked"`
+	Editable    bool   `json:"editable"`
+}
+
+type UserRolePermissionConfigResDto struct {
+	RoleID      uint64                         `json:"roleId"`
+	RoleCode    string                         `json:"roleCode"`
+	RoleName    string                         `json:"roleName"`
+	BuiltIn     bool                           `json:"builtIn"`
+	Editable    bool                           `json:"editable"`
+	Permissions []UserRolePermissionItemResDto `json:"permissions"`
+}
+
 // UserRoleResDto is the response DTO for a user role.
 type UserRoleResDto struct {
 	ID          uint64             `json:"id"`

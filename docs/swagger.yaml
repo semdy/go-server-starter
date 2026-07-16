@@ -320,6 +320,40 @@ definitions:
     - code
     - name
     type: object
+  go-server-starter_internal_dto.UserRolePermissionConfigResDto:
+    properties:
+      builtIn:
+        type: boolean
+      editable:
+        type: boolean
+      permissions:
+        items:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserRolePermissionItemResDto'
+        type: array
+      roleCode:
+        type: string
+      roleId:
+        type: integer
+      roleName:
+        type: string
+    type: object
+  go-server-starter_internal_dto.UserRolePermissionItemResDto:
+    properties:
+      checked:
+        type: boolean
+      code:
+        type: string
+      description:
+        type: string
+      editable:
+        type: boolean
+      enabled:
+        type: boolean
+      id:
+        type: integer
+      name:
+        type: string
+    type: object
   go-server-starter_internal_dto.UserRoleResDto:
     properties:
       builtIn:
@@ -351,6 +385,13 @@ definitions:
         items:
           type: integer
         type: array
+    type: object
+  go-server-starter_internal_dto.UserRoleTogglePermissionReqDto:
+    properties:
+      checked:
+        type: boolean
+    required:
+    - checked
     type: object
   go-server-starter_internal_dto.UserRoleUpdateReqDto:
     properties:
@@ -1014,8 +1055,33 @@ paths:
       tags:
       - role
   /role/{id}/permissions:
+    get:
+      description: 返回全局权限列表，并标记所选角色是否拥有、当前操作者是否可切换。super_admin 只读。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRolePermissionConfigResDto'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: 查询角色权限配置
+      tags:
+      - role
     put:
-      description: 替换当前租户自定义角色的权限；内置角色不可修改。
+      description: 替换角色权限；super_admin 不可修改，其他五个内置角色仅 super_admin 可配置，自定义角色由租户授权管理员配置。
       parameters:
       - description: 角色 ID
         in: path
@@ -1032,10 +1098,44 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/go-server-starter_internal_dto.UserRoleResDto'
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRolePermissionConfigResDto'
       security:
       - BearerAuth: []
       summary: 配置角色权限
+      tags:
+      - role
+  /role/{id}/permissions/{permissionId}:
+    patch:
+      consumes:
+      - application/json
+      description: 原子开启或关闭角色的一项权限；super_admin 不可修改，其他五个内置角色仅 super_admin 可配置。
+      parameters:
+      - description: 角色 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 权限 ID
+        in: path
+        name: permissionId
+        required: true
+        type: integer
+      - description: 开关状态
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/go-server-starter_internal_dto.UserRoleTogglePermissionReqDto'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/go-server-starter_internal_dto.UserRolePermissionConfigResDto'
+      security:
+      - BearerAuth: []
+      summary: 切换单个角色权限
       tags:
       - role
   /role/table:

@@ -12,10 +12,37 @@ import (
 type UserRoleHandler interface {
 	GetByID(c *gin.Context)
 	GetTable(c *gin.Context)
+	GetPermissionConfig(c *gin.Context)
 	Create(c *gin.Context)
 	Update(c *gin.Context)
 	Delete(c *gin.Context)
 	SetPermissions(c *gin.Context)
+	TogglePermission(c *gin.Context)
+}
+
+// GetPermissionConfig godoc
+// @Summary      查询角色权限配置
+// @Description  返回全局权限列表，并标记所选角色是否拥有、当前操作者是否可切换。super_admin 只读。
+// @Tags         role
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id   path      int  true  "角色 ID"
+// @Success      200  {object}  dto.UserRolePermissionConfigResDto
+// @Failure      404  {object}  map[string]interface{}
+// @Router       /role/{id}/permissions [get]
+func (h *UserRoleHandlerImpl) GetPermissionConfig(c *gin.Context) {
+	appCtx := ctx.FromGinCtx(c)
+	id, exc := appCtx.GetPathParamID("id")
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	res, exc := h.service.UserRole().GetPermissionConfig(appCtx.Ctx, id)
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	appCtx.ToSuccess(res)
 }
 
 type UserRoleHandlerImpl struct {
@@ -165,12 +192,12 @@ func (h *UserRoleHandlerImpl) Delete(c *gin.Context) {
 
 // SetPermissions godoc
 // @Summary 配置角色权限
-// @Description 替换当前租户自定义角色的权限；内置角色不可修改。
+// @Description 替换角色权限；super_admin 不可修改，其他五个内置角色仅 super_admin 可配置，自定义角色由租户授权管理员配置。
 // @Tags role
 // @Security BearerAuth
 // @Param id path int true "角色 ID"
 // @Param body body dto.UserRoleSetPermissionsReqDto true "权限 ID 列表"
-// @Success 200 {object} dto.UserRoleResDto
+// @Success 200 {object} dto.UserRolePermissionConfigResDto
 // @Router /role/{id}/permissions [put]
 func (h *UserRoleHandlerImpl) SetPermissions(c *gin.Context) {
 	appCtx := ctx.FromGinCtx(c)
@@ -185,6 +212,43 @@ func (h *UserRoleHandlerImpl) SetPermissions(c *gin.Context) {
 		return
 	}
 	res, exc := h.service.UserRole().SetPermissions(appCtx.Ctx, id, params)
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	appCtx.ToSuccess(res)
+}
+
+// TogglePermission godoc
+// @Summary      切换单个角色权限
+// @Description  原子开启或关闭角色的一项权限；super_admin 不可修改，其他五个内置角色仅 super_admin 可配置。
+// @Tags         role
+// @Accept       json
+// @Produce      json
+// @Security     BearerAuth
+// @Param        id            path  int                                    true  "角色 ID"
+// @Param        permissionId  path  int                                    true  "权限 ID"
+// @Param        body          body  dto.UserRoleTogglePermissionReqDto     true  "开关状态"
+// @Success      200           {object} dto.UserRolePermissionConfigResDto
+// @Router       /role/{id}/permissions/{permissionId} [patch]
+func (h *UserRoleHandlerImpl) TogglePermission(c *gin.Context) {
+	appCtx := ctx.FromGinCtx(c)
+	id, exc := appCtx.GetPathParamID("id")
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	permissionID, exc := appCtx.GetPathParamID("permissionId")
+	if exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	var params dto.UserRoleTogglePermissionReqDto
+	if exc := appCtx.ShouldBind(&params); exc != nil {
+		appCtx.ToError(exc)
+		return
+	}
+	res, exc := h.service.UserRole().TogglePermission(appCtx.Ctx, id, permissionID, *params.Checked)
 	if exc != nil {
 		appCtx.ToError(exc)
 		return

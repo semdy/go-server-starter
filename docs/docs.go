@@ -1034,13 +1034,52 @@ const docTemplate = `{
             }
         },
         "/role/{id}/permissions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回全局权限列表，并标记所选角色是否拥有、当前操作者是否可切换。super_admin 只读。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "查询角色权限配置",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRolePermissionConfigResDto"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
-                "description": "替换当前租户自定义角色的权限；内置角色不可修改。",
+                "description": "替换角色权限；super_admin 不可修改，其他五个内置角色仅 super_admin 可配置，自定义角色由租户授权管理员配置。",
                 "tags": [
                     "role"
                 ],
@@ -1067,7 +1106,60 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleResDto"
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRolePermissionConfigResDto"
+                        }
+                    }
+                }
+            }
+        },
+        "/role/{id}/permissions/{permissionId}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "原子开启或关闭角色的一项权限；super_admin 不可修改，其他五个内置角色仅 super_admin 可配置。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "role"
+                ],
+                "summary": "切换单个角色权限",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "角色 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "权限 ID",
+                        "name": "permissionId",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "开关状态",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRoleTogglePermissionReqDto"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/go-server-starter_internal_dto.UserRolePermissionConfigResDto"
                         }
                     }
                 }
@@ -1934,6 +2026,58 @@ const docTemplate = `{
                 }
             }
         },
+        "go-server-starter_internal_dto.UserRolePermissionConfigResDto": {
+            "type": "object",
+            "properties": {
+                "builtIn": {
+                    "type": "boolean"
+                },
+                "editable": {
+                    "type": "boolean"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/go-server-starter_internal_dto.UserRolePermissionItemResDto"
+                    }
+                },
+                "roleCode": {
+                    "type": "string"
+                },
+                "roleId": {
+                    "type": "integer"
+                },
+                "roleName": {
+                    "type": "string"
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserRolePermissionItemResDto": {
+            "type": "object",
+            "properties": {
+                "checked": {
+                    "type": "boolean"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "editable": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "go-server-starter_internal_dto.UserRoleResDto": {
             "type": "object",
             "properties": {
@@ -1980,6 +2124,17 @@ const docTemplate = `{
                     "items": {
                         "type": "integer"
                     }
+                }
+            }
+        },
+        "go-server-starter_internal_dto.UserRoleTogglePermissionReqDto": {
+            "type": "object",
+            "required": [
+                "checked"
+            ],
+            "properties": {
+                "checked": {
+                    "type": "boolean"
                 }
             }
         },

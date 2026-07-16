@@ -200,7 +200,7 @@ Built-in roles:
 - `user_svip` - SVIP user
 - `guest` - Guest user
 
-The six built-in roles are immutable. Tenant administrators can create custom roles and assign permissions they currently hold, except platform-level `tenant.*` permissions. Tenant management APIs require the built-in `super_admin` role and cannot be opened to custom roles. User-role assignments are scoped by tenant, so the same user can have different roles in different tenants.
+The six built-in roles have immutable metadata and cannot be deleted. `super_admin` permissions are also immutable; only `super_admin` can configure permissions on the other five built-in roles. Tenant administrators can create custom roles and assign permissions they currently hold, except platform-level `tenant.*` permissions. Tenant management APIs require the built-in `super_admin` role. User-role assignments are scoped by tenant, so the same user can have different roles in different tenants.
 
 Protect routes with permission checks:
 
@@ -233,8 +233,11 @@ Login and tenant-switch responses include `roles` and `permissions`. Clients can
 | DELETE | `/api/user/admin/{id}` | Delete user (soft) | admin+ |
 | GET | `/api/role/{id}` | Get role by ID | admin+ |
 | GET | `/api/role/table` | List roles (paginated) | admin+ |
+| GET | `/api/role/{id}/permissions` | Get global permissions and role switch state | `role.read` |
 | POST | `/api/role` | Create role | admin+ |
 | PUT | `/api/role/{id}` | Update role | admin+ |
+| PUT | `/api/role/{id}/permissions` | Replace custom role permissions | `role.assign_permissions` |
+| PATCH | `/api/role/{id}/permissions/{permissionId}` | Toggle one custom role permission | `role.assign_permissions` |
 | DELETE | `/api/role/{id}` | Delete role (soft) | admin+ |
 | GET | `/api/admin/tenants/code` | Generate tenant code | super_admin |
 | GET | `/api/admin/tenants/{id}` | Get tenant by ID | super_admin |

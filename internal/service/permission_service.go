@@ -26,6 +26,7 @@ type PermissionService interface {
 	DeleteAccessCache(ctx context.Context, uniCode string)
 	DeleteTenantAccessCache(ctx context.Context, tenantID uint64, uniCode string)
 	InvalidateTenantAccessCaches(ctx context.Context, tenantID uint64)
+	InvalidateGlobalAccessCaches(ctx context.Context)
 }
 
 type PermissionServiceImpl struct {
@@ -203,6 +204,14 @@ func (s *PermissionServiceImpl) InvalidateTenantAccessCaches(ctx context.Context
 		constant.RedisKeyOfAuthRoles(tenantID, "*"),
 		constant.RedisKeyOfAuthPermissions(tenantID, "*"),
 	}
+	s.invalidateAccessCachePatterns(ctx, patterns)
+}
+
+func (s *PermissionServiceImpl) InvalidateGlobalAccessCaches(ctx context.Context) {
+	s.invalidateAccessCachePatterns(ctx, []string{"auth:roles:*", "auth:permissions:*"})
+}
+
+func (s *PermissionServiceImpl) invalidateAccessCachePatterns(ctx context.Context, patterns []string) {
 	for _, pattern := range patterns {
 		var cursor uint64
 		for {

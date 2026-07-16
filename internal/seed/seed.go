@@ -20,16 +20,18 @@ type Seed interface {
 }
 
 type seed struct {
-	repo   repo.Repo
-	redis  *redis.Client
-	logger *zap.Logger
+	repo             repo.Repo
+	redis            *redis.Client
+	logger           *zap.Logger
+	createdRoleCodes map[string]struct{}
 }
 
 func NewSeed(repo repo.Repo, redis *redis.Client, logger *zap.Logger) Seed {
-	return &seed{repo: repo, redis: redis, logger: logger}
+	return &seed{repo: repo, redis: redis, logger: logger, createdRoleCodes: make(map[string]struct{})}
 }
 
 func (s *seed) Run() error {
+	clear(s.createdRoleCodes)
 	if err := s.SeedUserRole(); err != nil {
 		return err
 	}
@@ -131,6 +133,9 @@ func (s *seed) SeedUserRole() error {
 			s.logger.Error("failed to insert roles", zap.Error(err))
 			return err
 		}
+		for _, role := range newRoles {
+			s.createdRoleCodes[role.Code] = struct{}{}
+		}
 		s.logger.Info("successfully seeded roles", zap.Int("count", len(newRoles)))
 	} else {
 		s.logger.Info("all roles already exist, no need to seed")
@@ -177,14 +182,16 @@ func (s *seed) SeedPermissions() error {
 	if err != nil {
 		return err
 	}
-	adminIDs := make([]uint64, 0, len(constant.AdminPermissions))
-	for _, code := range constant.AdminPermissions {
-		if id, ok := permissionIDs[code]; ok {
-			adminIDs = append(adminIDs, id)
+	if _, created := s.createdRoleCodes[enum.RoleCodeAdmin.String()]; created {
+		adminIDs := make([]uint64, 0, len(constant.DefaultAdminPermissions))
+		for _, code := range constant.DefaultAdminPermissions {
+			if id, ok := permissionIDs[code]; ok {
+				adminIDs = append(adminIDs, id)
+			}
 		}
-	}
-	if err := s.repo.UserRole().ReplaceRolePermissions(ctx, admin.ID, adminIDs); err != nil {
-		return err
+		if err := s.repo.UserRole().ReplaceRolePermissions(ctx, admin.ID, adminIDs); err != nil {
+			return err
+		}
 	}
 
 	s.logger.Info("seeded permissions and built-in role mappings")
